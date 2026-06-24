@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Eurostar NPS Operational Driver Analysis v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1117; --surface: #181b24; --surface2: #1e2230; --border: #2a2f3e;
+  --text: #e8e9ed; --muted: #8b8fa3; --muted2: #5a6070;
+  --accent: #3d7fff; --green: #34d399; --red: #f87171; --amber: #fbbf24; --purple: #a78bfa;
+  --accent-dim: rgba(61,127,255,0.10); --green-dim: rgba(52,211,153,0.10);
+  --red-dim: rgba(248,113,113,0.10); --amber-dim: rgba(251,191,36,0.10);
+}
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.shell { max-width: 1440px; margin: 0 auto; padding: 28px 32px; }
+.header { margin-bottom: 6px; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.header-left h1 { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+.header-left h1 span { color: var(--accent); }
+.header-left .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; max-width: 680px; line-height: 1.5; }
+.header-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.badge { padding: 3px 9px; border-radius: 5px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge-amber { background: var(--amber-dim); color: var(--amber); }
+.badge-green { background: var(--green-dim); color: var(--green); }
+.badge-blue  { background: var(--accent-dim); color: var(--accent); }
+.badge-red   { background: var(--red-dim); color: var(--red); }
+.tabs { display: flex; gap: 4px; margin: 22px 0 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+.tab { padding: 8px 15px; border-radius: 8px 8px 0 0; border: 1px solid transparent; border-bottom: none;
+  background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 12.5px;
+  cursor: pointer; transition: all 0.18s; letter-spacing: 0.01em; position: relative; bottom: -1px; }
+.tab:hover { color: var(--text); background: var(--surface); border-color: var(--border); }
+.tab.active { border-color: var(--border); background: var(--surface); color: var(--text); font-weight: 600; border-bottom-color: var(--surface); }
+.panel { display: none; } .panel.active { display: block; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
+.span-2 { grid-column: span 2; } .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; }
+.card-title { font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.card-sub { font-size: 11.5px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+.chart-wrap { width: 100%; }
+.kpi-row { display: flex; justify-content: space-around; padding: 10px 0; flex-wrap: wrap; gap: 16px; align-items: center; }
+.kpi { text-align: center; }
+.kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.kpi-val  { font-size: 30px; font-weight: 700; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+.kpi-note { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+.dvdr { width: 1px; background: var(--border); align-self: stretch; min-height: 48px; }
+.finding { padding: 13px 16px; border-radius: 8px; border-left: 3px solid; margin-bottom: 12px; }
+.finding.blue   { border-color: var(--accent);  background: var(--accent-dim); }
+.finding.green  { border-color: var(--green);   background: var(--green-dim);  }
+.finding.red    { border-color: var(--red);     background: var(--red-dim);    }
+.finding.amber  { border-color: var(--amber);   background: var(--amber-dim);  }
+.finding .tag   { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; opacity: 0.8; margin-bottom: 5px; }
+.finding .body  { font-size: 12.5px; color: var(--text); line-height: 1.55; }
+.finding .body strong { font-weight: 700; }
+.finding .ci    { font-size: 10.5px; color: var(--muted); margin-top: 5px; font-family: 'JetBrains Mono', monospace; }
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { padding: 9px 12px; color: var(--muted); border-bottom: 2px solid var(--border); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
+td { padding: 9px 12px; border-bottom: 1px solid rgba(42,47,62,0.5); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(61,127,255,0.03); }
+.mono { font-family: 'JetBrains Mono', monospace; }
+.t-red   { color: var(--red);   font-weight: 600; }
+.t-green { color: var(--green); font-weight: 600; }
+.t-amber { color: var(--amber); font-weight: 600; }
+.t-muted { color: var(--muted); }
+.t-center { text-align: center; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.chip-red   { background: var(--red-dim);   color: var(--red); }
+.chip-green { background: var(--green-dim); color: var(--green); }
+.chip-amber { background: var(--amber-dim); color: var(--amber); }
+.chip-muted { background: rgba(139,143,163,0.12); color: var(--muted); }
+.chip-blue  { background: var(--accent-dim); color: var(--accent); }
+.slider-wrap { padding: 14px 0 4px; }
+.slider-row { display: flex; align-items: center; gap: 14px; }
+.slider-row label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+input[type=range] { flex: 1; accent-color: var(--accent); height: 4px; }
+.slider-val { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--text); min-width: 64px; text-align: right; }
+.scenario-nps { margin-top: 14px; display: flex; align-items: baseline; gap: 10px; }
+.scenario-nps .big { font-size: 38px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.scenario-nps .lbl { font-size: 12px; color: var(--muted); }
+.scenario-nps .ci  { font-size: 11px; color: var(--muted2); font-family: 'JetBrains Mono', monospace; }
+.threshold-ann { font-size: 11.5px; padding: 8px 12px; border-radius: 6px; margin-top: 10px; line-height: 1.5; }
+.pdn-bar { display: flex; height: 10px; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.pdn-seg { height: 100%; transition: width 0.3s; }
+.pdn-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+.group-tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 9.5px; font-weight: 600; margin-right: 4px; }
+.footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 10px; color: var(--muted2); text-align: center; }
+.note-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 11.5px; color: var(--muted); line-height: 1.6; margin-top: 10px; }
+.section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 8px; }
+@media (max-width: 900px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .span-2, .span-3, .span-4 { grid-column: span 1; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1><span>Eurostar</span> NPS: Operational Driver Analysis</h1>
+    <div class="sub">At what delay point does NPS fall sharply? Which failure modes hurt most? And what can operations actually do about it. N = 178,384 journeys · June 2026.</div>
+    <div class="header-badges">
+      <span class="badge badge-amber">Subquestion: Thresholds &amp; Compounding</span>
+      <span class="badge badge-blue">Ordered Logit · XGBoost · SHAP</span>
+      <span class="badge badge-green">Live results · v4</span>
+    </div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('summary',this)">Summary</button>
+  <button class="tab" onclick="switchTab('delay',this)">Delay Thresholds</button>
+  <button class="tab" onclick="switchTab('causes',this)">Failure Causes</button>
+  <button class="tab" onclick="switchTab('levers',this)">Operational Levers</button>
+  <button class="tab" onclick="switchTab('quality',this)">Service Quality</button>
+  <button class="tab" onclick="switchTab('segments',this)">Segment Effects</button>
+  <button class="tab" onclick="switchTab('preanalysis',this)">Pre-Analysis</button>
+</div>
+
+<!-- ══ SUMMARY ══ -->
+<div id="panel-summary" class="panel active">
+  <div class="grid-3" style="gap:16px;margin-bottom:16px">
+    <div class="card span-3">
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">Current NPS</div><div class="kpi-val" style="color:var(--amber)">34.4</div><div class="kpi-note">178,384 responses · N=50.98% P · 16.61% D</div></div>
+        <div class="dvdr"></div>
+        <div class="kpi"><div class="kpi-label">Eurostar Target</div><div class="kpi-val" style="color:var(--accent)">38.0</div><div class="kpi-note">Gap: -3.6 pts</div></div>
+        <div class="dvdr"></div>
+        <div class="kpi"><div class="kpi-label">NPS (no delay)</div><div class="kpi-val" style="color:var(--green)">46.3</div><div class="kpi-note">Ordered logit · +11.9 vs current</div></div>
+        <div class="dvdr"></div>
+        <div class="kpi"><div class="kpi-label">NPS collapse beyond</div><div class="kpi-val" style="color:var(--red)">46.5<span style="font-size:14px;color:var(--muted)"> min</span></div><div class="kpi-note">Near-zero NPS: 0.3 · -46 pts from on-time</div></div>
+        <div class="dvdr"></div>
+        <div class="kpi"><div class="kpi-label">Worst failure mode</div><div class="kpi-val" style="color:var(--red);font-size:20px;padding:5px 0">M3 Shortage</div><div class="kpi-note">-12.62 NPS even on-time · 27% below baseline</div></div>
+        <div class="dvdr"></div>
+        <div class="kpi"><div class="kpi-label">Model R² (ops only)</div><div class="kpi-val" style="color:var(--purple)">0.120</div><div class="kpi-note">±0.011 · 10 seeds</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-3" style="gap:14px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">Two critical delay thresholds</div>
+      <div class="finding blue">
+        <div class="tag" style="color:var(--accent)">Threshold 1 · 19.5 min: detractor territory begins</div>
+        <div class="body">Past <strong>19.5 minutes</strong> the typical passenger tips into detractor territory. Predicted NPS drops from 46.3 to 33.2, a 13.2-point loss (-28%). Promoter share falls around 7 percentage points.</div>
+      </div>
+      <div class="finding red">
+        <div class="tag" style="color:var(--red)">Threshold 2 · 46.5 min: NPS near zero</div>
+        <div class="body">Past <strong>46.5 minutes</strong> predicted NPS falls to <strong>0.3 (-99% from on-time)</strong>. The 26.5-46.5 min window is where recovery pays most: roughly 1 NPS point per minute pulled back.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">Controllable failures cost the most</div>
+      <div class="finding red">
+        <div class="tag" style="color:var(--red)">Rolling Stock: worst penalty at every delay level</div>
+        <div class="body">Above 26.5 min, Rolling Stock failures predict NPS of <strong>11.0</strong>, which is 10.6 pts below the delayed-service average of 21.7. This group covers <strong>M1 Reliability</strong> (rolling stock breakdowns), <strong>M2 Depot Release</strong> (late departure from depot), and <strong>M3 Trainset Shortage</strong> (fleet unavailability or substitution). All three are within Eurostar's control.</div>
+      </div>
+      <div class="finding green">
+        <div class="tag" style="color:var(--green)">Weather &amp; Traffic: low penalty</div>
+        <div class="body">External causes predict NPS <strong>~2 pts below average at >26.5 min</strong> (-9%). Passengers accept these delays differently. Actionability is limited.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">Fleet &amp; maintenance are actionable</div>
+      <div class="finding red">
+        <div class="tag" style="color:var(--red)">Equipment change · -9.73 NPS</div>
+        <div class="body">An unplanned equipment change knocks <strong>9.73 points off predicted NPS</strong> per affected service (95% CI: -11.5 to -8.0). Better turnaround planning and rolling stock reliability can prevent most of these.</div>
+      </div>
+      <div class="finding green">
+        <div class="tag" style="color:var(--green)">RUB fleet (newer Continental) · +11.73 NPS</div>
+        <div class="body">RUB trains (newer Continental fleet, N=6,214) predict <strong>+11.73 NPS vs TGH (Continental reference)</strong> (95% CI: +8.9 to +14.5), a <strong>+25% lift</strong>. This is a fleet-age effect: RUB is newer than TGH. Effect is uniform across delay levels, not interaction-dependent.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Prioritised recommendations</div>
+    <div class="card-sub">Ranked by estimated NPS impact · 95% CI from ordered logit · for goal programming handoff</div>
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Action</th><th>Lever</th>
+        <th class="t-center">Est. NPS gain</th><th class="t-center">% vs baseline</th><th class="t-center">95% CI</th>
+        <th class="t-center">Timeframe</th><th class="t-center">Controllable</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="mono t-muted">1</td><td>Prevent services crossing 19.5-min threshold; prioritise recovery for trains at 10-19 min lag</td><td>Arrival delay</td><td class="t-center mono t-green">+7 - +13</td><td class="t-center mono t-muted">+15-+28%</td><td class="t-center mono t-muted">±1.5 pts</td><td class="t-center"><span class="chip chip-blue">Short</span></td><td class="t-center"><span class="chip chip-green">Yes</span></td></tr>
+        <tr><td class="mono t-muted">2</td><td>Prioritise fleet availability planning and depot readiness to eliminate M3 Trainset Shortage incidents, which carry a -12.62 NPS deficit even on on-time services, before any delay compounds</td><td>Fleet planning (M3)</td><td class="t-center mono t-green">+12.62</td><td class="t-center mono t-muted">+27%</td><td class="t-center mono t-muted">model est.</td><td class="t-center"><span class="chip chip-blue">Short-Med</span></td><td class="t-center"><span class="chip chip-green">Yes</span></td></tr>
+        <tr><td class="mono t-muted">3</td><td>Eliminate unplanned equipment changes through rolling stock reliability and substitute-fleet readiness</td><td>Equipment change</td><td class="t-center mono t-green">+9.73</td><td class="t-center mono t-muted">+21%</td><td class="t-center mono t-muted">-11.5 to -8.0</td><td class="t-center"><span class="chip chip-blue">Short-Med</span></td><td class="t-center"><span class="chip chip-green">Yes</span></td></tr>
+        <tr><td class="mono t-muted">4</td><td>Fleet modernisation: accelerate RUB deployment on high-volume Continental routes. Fleet age predicts NPS independently of delay</td><td>Fleet investment</td><td class="t-center mono t-green">+11.73</td><td class="t-center mono t-muted">+25%</td><td class="t-center mono t-muted">+8.9 to +14.5</td><td class="t-center"><span class="chip chip-amber">Long</span></td><td class="t-center"><span class="chip chip-amber">Yes (capex)</span></td></tr>
+        <tr><td class="mono t-muted">5</td><td>Connecting passenger protocol: real-time alerts + auto-rebooking when delay exceeds 25 min</td><td>Segment triage</td><td class="t-center mono t-green">+2 - +4*</td><td class="t-center mono t-muted">+4-+9%</td><td class="t-center mono t-muted">pending</td><td class="t-center"><span class="chip chip-blue">Short</span></td><td class="t-center"><span class="chip chip-green">Yes</span></td></tr>
+        <tr><td class="mono t-muted">6</td><td>Review fare positioning above £90-100 value threshold; add transparent value messaging for high-fare journeys</td><td>Pricing</td><td class="t-center mono t-amber">+4 - +9*</td><td class="t-center mono t-muted">+9-+19%</td><td class="t-center mono t-muted">context-dep.</td><td class="t-center"><span class="chip chip-blue">Short-Med</span></td><td class="t-center"><span class="chip chip-amber">Partial</span></td></tr>
+        <tr><td class="mono t-muted">7</td><td>Maintain PM schedules for catering systems. Days since catering PM is rank-4 operational Detractor driver (SHAP)</td><td>Preventive maintenance</td><td class="t-center mono t-amber">SHAP sig.</td><td class="t-center mono t-muted">-</td><td class="t-center mono t-muted">no logit CI</td><td class="t-center"><span class="chip chip-blue">Short</span></td><td class="t-center"><span class="chip chip-green">Yes</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div style="font-size:10.5px;color:var(--muted);margin-top:10px;">* Asterisked items are pending interaction model results. % column is relative to the no-delay baseline of 46.3. Continental fleet reference is TGH; Channel fleet reference is E300.</div>
+  </div>
+</div>
+
+<!-- ══ DELAY THRESHOLDS ══ -->
+<div id="panel-delay" class="panel">
+  <div class="card span-2" style="margin-bottom:16px">
+    <div class="finding blue">
+      <div class="tag" style="color:var(--accent)">How to read this chart</div>
+      <div class="body">Each bar is predicted NPS for services in that delay band, with everything else held at sample mean. The sharpest single drop is 26.5→46.5 min (<strong>-21 pts, -97%</strong> of remaining NPS), which is also where recovery effort pays back the most. Error bars are 95% CI from ordered logit.</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card span-2">
+      <div class="card-title">Arrival delay threshold ladder</div>
+      <div class="card-sub">Predicted NPS by delay band · ordered logit · 95% CI · all other variables at sample mean · colour = NPS zone</div>
+      <div class="chart-wrap" id="delay-ladder-chart" style="height:320px"></div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Delay scenario explorer</div>
+      <div class="card-sub">Drag to explore any delay level. Shows NPS, class breakdown, and context</div>
+      <div class="slider-wrap">
+        <div class="slider-row">
+          <label>Arrival delay (min)</label>
+          <input type="range" id="delay-slider" min="0" max="160" value="0" step="1" oninput="updateDelayScenario()"/>
+          <span class="slider-val" id="slider-display">0 min</span>
+        </div>
+      </div>
+      <div class="scenario-nps">
+        <div class="big" id="scenario-nps-val" style="color:var(--green)">46.3</div>
+        <div>
+          <div class="lbl">Predicted NPS</div>
+          <div class="ci" id="scenario-ci">[45.7 - 47.0]</div>
+        </div>
+        <div style="flex:1; text-align:right">
+          <div class="lbl">Change vs on-time</div>
+          <div id="scenario-change" style="font-size:16px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace">—</div>
+          <div id="scenario-pct" style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace"></div>
+        </div>
+      </div>
+      <!-- Promoter / Passive / Detractor bar -->
+      <div style="margin-top:14px">
+        <div class="section-label">Estimated passenger breakdown</div>
+        <div class="pdn-bar">
+          <div class="pdn-seg" id="pbar-p" style="background:var(--green);width:58%"></div>
+          <div class="pdn-seg" id="pbar-n" style="background:var(--amber);width:30%"></div>
+          <div class="pdn-seg" id="pbar-d" style="background:var(--red);width:12%"></div>
+        </div>
+        <div class="pdn-labels">
+          <span id="pdn-p" style="color:var(--green)">P 58%</span>
+          <span id="pdn-n" style="color:var(--amber)">N 30%</span>
+          <span id="pdn-d" style="color:var(--red)">D 12%</span>
+        </div>
+        <div style="font-size:9.5px;color:var(--muted2);margin-top:4px">Estimated from ordered logit · Passive share assumed stable at ~30%</div>
+      </div>
+      <div class="threshold-ann" id="threshold-ann" style="background:var(--green-dim);color:var(--green);border-left:3px solid var(--green)">
+        Service is on time. Optimal NPS territory.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Threshold reference table</div>
+      <div class="card-sub">Each threshold marks a step-change in NPS. % shown relative to on-time baseline</div>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Delay band</th><th class="t-center">Predicted NPS</th><th class="t-center">vs on-time</th><th class="t-center">% change</th><th>Zone</th></tr></thead>
+        <tbody>
+          <tr><td>No delay</td><td class="t-center mono t-green">46.3</td><td class="t-center mono t-muted">-</td><td class="t-center mono t-muted">-</td><td><span class="chip chip-green">Promoter zone</span></td></tr>
+          <tr><td>&gt;10.5 min</td><td class="t-center mono">39.3</td><td class="t-center mono t-amber">-7.0</td><td class="t-center mono t-amber">-15%</td><td><span class="chip chip-amber">Moderate slip</span></td></tr>
+          <tr style="background:rgba(251,191,36,0.05)"><td><strong>&gt;19.5 min ⚠</strong></td><td class="t-center mono t-amber"><strong>33.2</strong></td><td class="t-center mono t-red"><strong>-13.2</strong></td><td class="t-center mono t-red"><strong>-28%</strong></td><td><span class="chip chip-amber">Detractor onset</span></td></tr>
+          <tr><td>&gt;26.5 min</td><td class="t-center mono">21.7</td><td class="t-center mono t-red">-24.7</td><td class="t-center mono t-red">-53%</td><td><span class="chip chip-red">Sharp drop</span></td></tr>
+          <tr style="background:rgba(248,113,113,0.05)"><td><strong>&gt;46.5 min 🔴</strong></td><td class="t-center mono t-red"><strong>0.3</strong></td><td class="t-center mono t-red"><strong>-46.0</strong></td><td class="t-center mono t-red"><strong>-99%</strong></td><td><span class="chip chip-red">Near collapse</span></td></tr>
+          <tr><td>&gt;91.5 min</td><td class="t-center mono t-red">-17.4</td><td class="t-center mono t-red">-63.8</td><td class="t-center mono t-muted">-</td><td><span class="chip chip-red">Severe</span></td></tr>
+          <tr><td>&gt;142.5 min</td><td class="t-center mono t-red">-34.8</td><td class="t-center mono t-red">-81.1</td><td class="t-center mono t-muted">-</td><td><span class="chip chip-red">Floor</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="note-box" style="margin-top:10px">
+        The 26.5-46.5 min band returns roughly 1 NPS point per minute recovered. Past 46.5 min, preventing the delay in the first place is worth more than any recovery effort. Compensation and proactive communication become the priority.
+      </div>
+    </div>
+  </div>
+
+  <!-- Early journey section -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Early journey delay: separate compounding effect</div>
+    <div class="card-sub">Detected via SHAP interaction analysis and decision tree thresholds · ordered logit confirmation pending</div>
+    <div class="grid-3" style="gap:14px;margin-top:4px;margin-bottom:16px">
+      <div class="finding blue" style="margin-bottom:0">
+        <div class="tag" style="color:var(--accent)">Onset: 13.5 min</div>
+        <div class="body">Early journey delay starts costing NPS from <strong>13.5 minutes</strong>. Decision tree and SHAP both pick up the same threshold. It adds to arrival delay rather than replacing it.</div>
+      </div>
+      <div class="finding amber" style="margin-bottom:0">
+        <div class="tag" style="color:var(--amber)">Plateaus around 50 min, unlike arrival delay</div>
+        <div class="body">Early journey delay damage <strong>levels off around 50 minutes</strong>. Arrival delay keeps falling all the way to 300+ min. Recovery effort past 50 min of early delay returns very little. The money is in the first half hour.</div>
+      </div>
+      <div class="finding red" style="margin-bottom:0">
+        <div class="tag" style="color:var(--red)">Both thresholds at once: worse than adding them up</div>
+        <div class="body">When <strong>both</strong> delays cross their thresholds together, the combined NPS hit runs <strong>~10-15% above what you'd predict from adding them separately</strong>. SHAP interaction rank 2 of all operational pairs (mean abs = 0.032). Ordered logit Models F/G still to run.</div>
+      </div>
+    </div>
+    <div class="grid-2" style="gap:16px">
+      <div>
+        <div class="section-label">EJ delay vs arrival delay: shape comparison</div>
+        <div class="chart-wrap" id="ej-compare-chart" style="height:220px"></div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:6px">Arrival delay keeps falling past 300 min. Early journey delay levels off around 50 min. Recovery effort beyond that point gives very little back.</div>
+      </div>
+      <div>
+        <div class="section-label">Dual-delay compounding: NPS by scenario</div>
+        <div class="chart-wrap" id="dual-delay-chart" style="height:220px"></div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:6px">Breaching both thresholds at once costs 10-15% more than the two effects added separately. Source: SHAP interaction pair rank 2 (mean_abs = 0.032).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FAILURE CAUSES ══ -->
+<div id="panel-causes" class="panel">
+  <div class="finding red" style="margin-bottom:14px">
+    <div class="tag" style="color:var(--red)">Headline finding</div>
+    <div class="body">Rolling Stock failures cost the most at every delay level, and they're the group Eurostar has the most control over. Rolling Stock = <span class="group-tag" style="background:var(--red-dim);color:var(--red)">M1 Reliability</span> <span class="group-tag" style="background:var(--red-dim);color:var(--red)">M2 Depot Release</span> <span class="group-tag" style="background:var(--red-dim);color:var(--red)">M3 Trainset Shortage</span>. The two cheapest groups (Weather, Traffic Regulation) are externally driven. Passengers don't hold those against the operator in the same way.</div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card span-2">
+      <div class="card-title">Cause group x delay band: predicted NPS</div>
+      <div class="card-sub">Three delay scenarios per group · group contents shown below</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div style="font-size:10.5px;color:var(--muted)"><strong style="color:var(--red)">Rolling Stock</strong> = M1 Reliability · M2 Depot Release · M3 Trainset Shortage</div>
+        <div style="font-size:10.5px;color:var(--muted)"><strong style="color:var(--amber)">Passenger-Related</strong> = S1 Passenger Incident · S2 Congestion · I2 People · I5 Train Incident</div>
+        <div style="font-size:10.5px;color:var(--muted)"><strong style="color:var(--accent)">Eurostar Operations</strong> = K1 Catering · O1 Driving · O2 Train Manager · O3 Planning · O4 OCC · S4 Terminal Staff</div>
+        <div style="font-size:10.5px;color:var(--muted)"><strong style="color:#60a5fa">Infrastructure</strong> = I3 InfraWorks · I4 InfraFault</div>
+        <div style="font-size:10.5px;color:var(--muted)"><strong style="color:var(--muted)">Traffic Regulation</strong> = I6 TrafficReg · A4 LostPathway</div>
+        <div style="font-size:10.5px;color:var(--muted)"><strong style="color:var(--muted)">Weather / Safety</strong> = Weather Safety</div>
+      </div>
+      <div class="chart-wrap" id="cause-group-chart" style="height:280px"></div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Specific failure modes: no-delay NPS</div>
+      <div class="card-sub">NPS before any delay compounds · sorted worst → best · all vs 46.3 baseline</div>
+      <div class="chart-wrap" id="cause-detail-chart" style="height:340px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cause group ranking: controllability matrix</div>
+      <div class="card-sub">NPS at each delay band vs average delayed · negative = worse than average · % shown</div>
+      <div class="tbl-wrap" style="margin-top:8px">
+      <table>
+        <thead><tr><th>Cause group</th><th>Includes</th><th class="t-center">NPS no delay</th><th class="t-center">NPS &gt;26.5</th><th class="t-center">Extra cost*</th><th class="t-center">Ctrl.</th></tr></thead>
+        <tbody>
+          <tr style="background:rgba(248,113,113,0.06)">
+            <td><strong style="color:var(--red)">Rolling Stock</strong></td>
+            <td style="font-size:10px;color:var(--muted)">M1, M2, M3</td>
+            <td class="t-center mono">37.0 <span style="font-size:9px;color:var(--muted)">-20%</span></td>
+            <td class="t-center mono t-red">11.0</td>
+            <td class="t-center mono t-red">-10.6<br><span style="font-size:9px">-49%</span></td>
+            <td class="t-center"><span class="chip chip-green">Yes</span></td>
+          </tr>
+          <tr>
+            <td>Passenger-Related</td>
+            <td style="font-size:10px;color:var(--muted)">S1, S2, I2, I5</td>
+            <td class="t-center mono">40.3 <span style="font-size:9px;color:var(--muted)">-13%</span></td>
+            <td class="t-center mono t-amber">14.7</td>
+            <td class="t-center mono t-amber">-7.0<br><span style="font-size:9px">-32%</span></td>
+            <td class="t-center"><span class="chip chip-amber">Partial</span></td>
+          </tr>
+          <tr>
+            <td>Eurostar Operations</td>
+            <td style="font-size:10px;color:var(--muted)">K1, O1-O4, S4</td>
+            <td class="t-center mono">41.7 <span style="font-size:9px;color:var(--muted)">-10%</span></td>
+            <td class="t-center mono t-amber">16.3</td>
+            <td class="t-center mono t-amber">-5.3<br><span style="font-size:9px">-24%</span></td>
+            <td class="t-center"><span class="chip chip-green">Yes</span></td>
+          </tr>
+          <tr>
+            <td>Infrastructure</td>
+            <td style="font-size:10px;color:var(--muted)">I3, I4</td>
+            <td class="t-center mono">42.6 <span style="font-size:9px;color:var(--muted)">-8%</span></td>
+            <td class="t-center mono">17.4</td>
+            <td class="t-center mono t-muted">-4.3<br><span style="font-size:9px">-20%</span></td>
+            <td class="t-center"><span class="chip chip-muted">Partial</span></td>
+          </tr>
+          <tr>
+            <td>Traffic Regulation</td>
+            <td style="font-size:10px;color:var(--muted)">I6, A4</td>
+            <td class="t-center mono">44.6 <span style="font-size:9px;color:var(--muted)">-4%</span></td>
+            <td class="t-center mono">19.6</td>
+            <td class="t-center mono t-muted">-2.0<br><span style="font-size:9px">-9%</span></td>
+            <td class="t-center"><span class="chip chip-muted">No</span></td>
+          </tr>
+          <tr>
+            <td>Weather / Safety</td>
+            <td style="font-size:10px;color:var(--muted)">Weather</td>
+            <td class="t-center mono">45.1 <span style="font-size:9px;color:var(--muted)">-3%</span></td>
+            <td class="t-center mono">20.2</td>
+            <td class="t-center mono t-muted">-1.5<br><span style="font-size:9px">-7%</span></td>
+            <td class="t-center"><span class="chip chip-muted">No</span></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <div style="font-size:10px;color:var(--muted2);margin-top:8px">* Extra cost = difference from the delayed-service average NPS (21.7) at &gt;26.5 min. % is relative to 21.7. All figures hold delay band and other variables at sample mean.</div>
+    </div>
+  </div>
+
+  <!-- M3 highlight -->
+  <div class="card" style="border-color:rgba(248,113,113,0.3);margin-bottom:16px">
+    <div class="card-title">M3 Trainset Shortage: single worst failure mode</div>
+    <div class="card-sub">M3 Trainset Shortage costs NPS even before any delay is recorded: -12.62 pts (-27%) vs on-time baseline</div>
+    <div class="grid-4" style="margin-top:10px">
+      <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">NPS (no delay)</div>
+        <div style="font-size:28px;font-weight:700;color:var(--red);font-family:'JetBrains Mono',monospace">33.7</div>
+        <div style="font-size:10px;color:var(--muted)">vs 46.3 baseline</div>
+        <div style="font-size:10px;color:var(--red);font-weight:600">-12.62 pts · -27%</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">NPS &gt;26.5 min delay</div>
+        <div style="font-size:28px;font-weight:700;color:var(--red);font-family:'JetBrains Mono',monospace">6.6</div>
+        <div style="font-size:10px;color:var(--muted)">vs 21.7 avg delayed</div>
+        <div style="font-size:10px;color:var(--red);font-weight:600">-15.1 pts · -70%</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">NPS &gt;46.5 min delay</div>
+        <div style="font-size:28px;font-weight:700;color:var(--red);font-family:'JetBrains Mono',monospace">-15.1</div>
+        <div style="font-size:10px;color:var(--muted)">vs 0.3 avg at this band</div>
+        <div style="font-size:10px;color:var(--red);font-weight:600">-15.4 pts vs band avg</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Records (N)</div>
+        <div style="font-size:28px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace">1,391</div>
+        <div style="font-size:10px;color:var(--muted)">Affected service-journeys</div>
+        <div style="font-size:10px;color:var(--muted)">0.78% of dataset</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:12.5px;color:var(--muted);line-height:1.6;">
+      Trainset shortages hurt NPS <em>before any delay is recorded</em>. Passengers on services running with substitute or shortage-affected stock score lower even on punctual journeys. The deficit appears to reflect the experience quality of substitute stock as much as any disruption signal. Better depot readiness and fleet availability planning can close this gap independent of punctuality.
+    </div>
+  </div>
+
+  <!-- Compensation section -->
+  <div class="card" style="border-color:rgba(167,139,250,0.3)">
+    <div class="card-title">Compensation: non-separable from delay effect</div>
+    <div class="card-sub">H2 test · delay >60 min compensation collinearity finding</div>
+    <div class="grid-2" style="gap:16px;margin-top:10px">
+      <div class="finding amber" style="margin-bottom:0">
+        <div class="tag" style="color:var(--amber)">Can't separate from delay_gt60</div>
+        <div class="body">In this dataset, <strong>every journey delayed more than 60 min received compensation</strong>; none below that threshold did. That makes <code style="font-family:'JetBrains Mono',monospace;font-size:11px">delay_gt60</code> and compensation receipt the same signal. There's no way to isolate the compensation effect independently with this data.</div>
+      </div>
+      <div class="finding blue" style="margin-bottom:0">
+        <div class="tag" style="color:var(--accent)">What to do with this</div>
+        <div class="body">There are <strong>331 zero-compensation journeys</strong> in the &gt;60 min subset, too few to get a clean separation (0.19% of that band). H2 should be closed as "non-separable from delay_gt60 in current data." Isolating the compensation effect properly would need a future dataset with partial coverage across the threshold.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ OPERATIONAL LEVERS ══ -->
+<div id="panel-levers" class="panel">
+  <div class="finding blue" style="margin-bottom:14px">
+    <div class="tag" style="color:var(--accent)">Reference classes &amp; methodology</div>
+    <div class="body">Continental fleet comparisons use TGH as the reference; Channel comparisons use E300. Cross-type comparisons aren't valid. The two routes are different products. The TGH vs E300 entry in the chart is indicative only and shouldn't be treated as actionable. Ordered logit CIs are available for all logit-estimated variables. CM/PM/cleaning variables are ranked by SHAP only. No ordered logit CIs.</div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card span-2">
+      <div class="card-title">NPS impact of operational levers: ordered logit estimates</div>
+      <div class="card-sub">Green = controllable NPS gain · grey = structural or partial control only · 95% CI shown</div>
+      <div class="chart-wrap" id="levers-chart" style="height:360px"></div>
+    </div>
+  </div>
+
+  <div class="grid-3" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Fleet type: ordered logit estimates</div>
+      <div class="card-sub">Continental: vs TGH reference · Channel: vs E300 reference · 95% CI from ordered logit</div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600">RUB <span style="font-size:10px;color:var(--muted);font-weight:400">(newer Continental)</span></div>
+            <div style="font-size:10.5px;color:var(--muted)">N=6,214 · fleet-age effect · uniform lift · vs TGH reference</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace">+11.73 <span style="font-size:11px">+25%</span></div>
+            <div style="font-size:10px;color:var(--muted)">CI: +8.9 to +14.5 · <strong>Significant</strong></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600">TGH <span style="font-size:10px;color:var(--muted);font-weight:400">(older Continental)</span></div>
+            <div style="font-size:10.5px;color:var(--muted)">N=53,984 · ceiling-side SHAP interactions</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:700;color:var(--muted);font-family:'JetBrains Mono',monospace">-1.19 <span style="font-size:11px">-3%</span></div>
+            <div style="font-size:10px;color:var(--muted)">CI: -3.7 to +1.3 · <em>Not significant</em></div>
+          </div>
+        </div>
+        <div style="padding:10px 0">
+          <div style="font-size:13px;font-weight:600">E300 <span style="font-size:10px;color:var(--muted);font-weight:400">(reference class)</span></div>
+          <div style="font-size:10.5px;color:var(--muted)">Standard Channel fleet · baseline for all comparisons</div>
+        </div>
+      </div>
+      <div class="note-box" style="margin-top:4px">
+        RUB is the newest Continental fleet; TGH is older. RUB's NPS advantage is flat across delay levels. It's not amplified or dampened by disruption. TGH's main effect is non-significant, but SHAP interactions show it limits the upper end of satisfaction under delay (arrival delay, early journey delay, disruption, all ceiling-side). These are complementary findings: RUB shifts the baseline, TGH constrains the ceiling.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Price sensitivity</div>
+      <div class="card-sub">NPS cost per fare increment above sample mean · logit estimate · thresholds visible</div>
+      <div class="chart-wrap" id="price-chart" style="height:200px"></div>
+      <div style="margin-top:8px">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;flex:1;text-align:center">
+            <div style="font-size:9.5px;color:var(--muted);margin-bottom:2px">£+50 vs mean</div>
+            <div style="font-size:15px;font-weight:700;color:var(--amber);font-family:'JetBrains Mono',monospace">-4.43 <span style="font-size:10px">-10%</span></div>
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:8px 10px;flex:1;text-align:center">
+            <div style="font-size:9.5px;color:var(--muted);margin-bottom:2px">£+100 vs mean</div>
+            <div style="font-size:15px;font-weight:700;color:var(--red);font-family:'JetBrains Mono',monospace">-9.03 <span style="font-size:10px">-19%</span></div>
+          </div>
+        </div>
+        <div class="note-box">
+          SHAP puts perceived value-for-money as the <strong>root split</strong> in the full price+staff tree. A passenger who already feels overcharged enters the journey with less goodwill, which dampens every other operational effect. <strong>£90-100 above the mean fare</strong> is roughly where price perception turns negative. At moderate delays, passengers on high fares tend to score harder, consistent with expectation mismatch.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Other ordered logit estimates</div>
+      <div class="card-sub">Structural and passenger-type variables · with 95% CI</div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Connecting passenger</div>
+            <div style="font-size:10.5px;color:var(--muted)">Passengers with onward connections · higher stakes under delay</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:700;color:var(--amber);font-family:'JetBrains Mono',monospace">-2.22 <span style="font-size:11px">-5%</span></div>
+            <div style="font-size:10px;color:var(--muted)">CI: -3.3 to -1.0</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+          <div>
+            <div style="font-size:13px;font-weight:600">Channel vs Continental</div>
+            <div style="font-size:10.5px;color:var(--muted)">Route/product mix gap · not operationally addressable</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace">+18.6 <span style="font-size:11px">+40%</span></div>
+            <div style="font-size:10px;color:var(--muted)">CI: +17.4 to +19.9</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SERVICE QUALITY ══ -->
+<div id="panel-quality" class="panel">
+  <div class="finding blue" style="margin-bottom:14px">
+    <div class="tag" style="color:var(--accent)">What this section covers</div>
+    <div class="body">Current Maintenance (CM: open faults), Preventive Maintenance (PM: days since last service), and cleaning variables. All ranked by SHAP from the XGBoost operational_only model. No ordered logit CIs for these individually. Treat SHAP rank as relative importance. The individual effects are modest; they compound across the journey.</div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Preventive maintenance (PM): SHAP importance by class</div>
+      <div class="card-sub">Days since last PM inspection · operational_only XGBoost · ranked by Detractor SHAP</div>
+      <div class="chart-wrap" id="pm-chart" style="height:240px"></div>
+      <div class="note-box" style="margin-top:10px">
+        <strong>pm_days_since_catering is the fourth-ranked operational Detractor driver</strong>, behind arrival delay, early journey delay, and disruption. Catering PM recency carries a stronger SHAP signal than most current-fault variables. The physical condition of catering systems appears directly visible to passengers. Comms and toilet PM follow.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Current maintenance (CM) open faults: SHAP importance</div>
+      <div class="card-sub">Open CM defects by system · price_and_staff XGBoost · ranked by Detractor SHAP</div>
+      <div class="chart-wrap" id="cm-chart" style="height:240px"></div>
+      <div class="note-box" style="margin-top:10px">
+        <strong>WiFi faults</strong> top the CM ranking for both Detractor and Promoter classes. It's the most visible fault type. Passengers notice immediately, and the effect runs in both directions. Interior, catering, and climate faults follow. Total open faults captures overall system condition rather than any specific failure.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Cleaning: variables and specification notes</div>
+      <div class="card-sub">Routine clean score · deep clean recency · KPI threshold (95 pts)</div>
+      <div class="chart-wrap" id="clean-chart" style="height:200px"></div>
+      <div class="note-box" style="margin-top:10px">
+        <strong>Specification note:</strong> <code style="font-family:'JetBrains Mono',monospace;font-size:11px">clean_score_routine</code> = 0 for all 62,119 Continental rows, an imputation artifact, not real scores. Channel-only analysis shows a mild non-monotonic shape. Eurostar's actual cleaning KPI target is <strong>95 points</strong>, not 90. The corrected variable <code style="font-family:'JetBrains Mono',monospace;font-size:11px">clean_below_95_channel</code> flags about half of Channel services below target (mean 93.8, median 94.3).
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">CM / PM / Cleaning: summary reference table</div>
+      <div class="card-sub">All SHAP values from XGBoost · class = where effect is strongest</div>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Type</th><th class="t-center">SHAP Det.</th><th class="t-center">SHAP Prom.</th><th class="t-center">Primary class</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Days since catering PM</td><td>PM</td><td class="t-center mono t-red">0.038</td><td class="t-center mono t-muted">0.003</td><td class="t-center"><span class="chip chip-red">Detractor</span></td><td style="font-size:10px;color:var(--muted)">Rank 4 operational driver</td></tr>
+          <tr><td>Days since comms PM</td><td>PM</td><td class="t-center mono t-red">0.027</td><td class="t-center mono t-muted">0.002</td><td class="t-center"><span class="chip chip-red">Detractor</span></td><td style="font-size:10px;color:var(--muted)">Entertainment/comms</td></tr>
+          <tr><td>Days since toilet PM (resid)</td><td>PM</td><td class="t-center mono t-amber">0.023</td><td class="t-center mono t-muted">0.003</td><td class="t-center"><span class="chip chip-red">Detractor</span></td><td style="font-size:10px;color:var(--muted)">Route-mean adjusted</td></tr>
+          <tr><td>WiFi open fault (cm_open_wifi)</td><td>CM</td><td class="t-center mono t-amber">0.026</td><td class="t-center mono t-green">0.018</td><td class="t-center"><span class="chip chip-red">Both</span></td><td style="font-size:10px;color:var(--muted)">Top CM variable</td></tr>
+          <tr><td>Routine clean score</td><td>Cleaning</td><td class="t-center mono t-muted">0.012</td><td class="t-center mono t-muted">0.003</td><td class="t-center"><span class="chip chip-amber">Passive</span></td><td style="font-size:10px;color:var(--muted)">Channel-only valid</td></tr>
+          <tr><td>Last clean score</td><td>Cleaning</td><td class="t-center mono t-muted">0.010</td><td class="t-center mono t-muted">0.002</td><td class="t-center"><span class="chip chip-amber">Passive</span></td><td style="font-size:10px;color:var(--muted)">Below 95 = below KPI</td></tr>
+          <tr><td>Total open faults</td><td>CM</td><td class="t-center mono t-muted">0.007</td><td class="t-center mono t-muted">0.007</td><td class="t-center"><span class="chip chip-amber">Passive</span></td><td style="font-size:10px;color:var(--muted)">Aggregate condition</td></tr>
+          <tr><td>Interior faults (cm_open_interior)</td><td>CM</td><td class="t-center mono t-muted">0.014</td><td class="t-center mono t-muted">0.007</td><td class="t-center"><span class="chip chip-red">Detractor</span></td><td style="font-size:10px;color:var(--muted)">Seats, tables, racks</td></tr>
+          <tr><td>Days since interior PM</td><td>PM</td><td class="t-center mono t-muted">0.018</td><td class="t-center mono t-muted">0.002</td><td class="t-center"><span class="chip chip-red">Detractor</span></td><td style="font-size:10px;color:var(--muted)">price+staff: Promoter too</td></tr>
+          <tr><td>Hours since routine clean</td><td>Cleaning</td><td class="t-center mono t-muted">0.008</td><td class="t-center mono t-muted">0.002</td><td class="t-center"><span class="chip chip-amber">Passive</span></td><td style="font-size:10px;color:var(--muted)">Clean recency</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">SHAP interactions involving CM/PM variables</div>
+    <div class="card-sub">operational_only XGBoost · mean absolute SHAP interaction value · top three pairs involving CM/PM variables</div>
+    <div class="grid-3" style="gap:14px;margin-top:10px">
+      <div class="finding blue" style="margin-bottom:0">
+        <div class="tag" style="color:var(--accent)">Arrival delay × toilet PM · 0.0043</div>
+        <div class="body">Poor toilet maintenance amplifies the NPS hit from delay. A disrupted journey on a train with overdue toilet maintenance is measurably worse than either factor alone.</div>
+      </div>
+      <div class="finding blue" style="margin-bottom:0">
+        <div class="tag" style="color:var(--accent)">PM catering × PM interior · 0.0038</div>
+        <div class="body">Overdue catering and interior maintenance compound each other. Keeping one system current while neglecting the other doesn't capture the full gain. The scheduling needs to be consistent across domains.</div>
+      </div>
+      <div class="finding blue" style="margin-bottom:0">
+        <div class="tag" style="color:var(--accent)">Arrival delay × comms PM · 0.0037</div>
+        <div class="body">Delayed journeys on trains with overdue comms/entertainment maintenance score worse than the arithmetic would suggest. Whether that's reduced distraction, failed communication during the delay, or both is hard to separate from this data.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SEGMENT EFFECTS ══ -->
+<div id="panel-segments" class="panel">
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Connecting passengers: priority protection segment</div>
+      <div class="card-sub">SHAP interaction analysis · ordered logit interaction model pending</div>
+      <div class="finding red" style="margin-top:10px">
+        <div class="tag" style="color:var(--red)">Baseline disadvantage</div>
+        <div class="body">Passengers with onward connections score <strong>2.19 points lower at baseline</strong> (CI: -3.3 to -1.0). That gap grows past 25 minutes once connection risk becomes real. SHAP shows stronger negative values for this group in the 25-50 min delay range.</div>
+      </div>
+      <div class="finding blue">
+        <div class="tag" style="color:var(--accent)">Recommended intervention</div>
+        <div class="body">Real-time delay alerts, automatic rebooking triggers, and proactive compensation once arrival delay exceeds 25 min. Connecting passengers are the segment where service recovery effort returns the most NPS per passenger reached.</div>
+        <div class="ci">Ordered logit interaction estimate: pending Model D results</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Passenger motivation: delay tolerance differs</div>
+      <div class="card-sub">SHAP dependence plots · XGBoost · replicated across feature sets</div>
+      <div style="margin-top:12px">
+        <div style="padding:12px;background:var(--surface2);border-radius:8px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--green)">Brand-loyal passengers (prefer train)</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.55">Brand loyalty partially cushions moderate delay penalties. NPS effect is additive with reason_quickest: combined loyalty = 8.67 vs single = 8.05-8.24 vs neither = 7.49. The two variables work <strong>independently</strong>. There's no interaction between them (corr = -0.184).</div>
+        </div>
+        <div style="padding:12px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--amber)">Captive passengers (no viable alternative)</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.55">Score lower at baseline and show a floor effect. Extra delay minutes don't compound as strongly once these passengers are already dissatisfied. The dissatisfaction looks structural (no viable alternative, price perception) rather than operationally driven. Mechanically distinct from brand-loyalty buffering.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Staff perception: moderator of operational effects</div>
+    <div class="card-sub">SHAP analysis · XGBoost price_and_staff · staff_composite = 5-point composite of onboard staff ratings</div>
+    <div class="grid-3" style="gap:14px;margin-top:10px">
+      <div class="finding green" style="margin:0">
+        <div class="tag" style="color:var(--green)">Strongest monotonic relationship</div>
+        <div class="body">Staff composite has the cleanest monotonic relationship in the dataset: SHAP values run from -3 to +1 across scores 1-5 with no threshold kinks. In the price_and_staff model, staff_composite is the top driver for both Detractor (SHAP 0.537) and Promoter (0.375) classes, well above any operational variable.</div>
+      </div>
+      <div class="finding amber" style="margin:0">
+        <div class="tag" style="color:var(--amber)">Delay amplifier: asymmetric effect</div>
+        <div class="body">Low staff scores make delay more costly. Staff × arrival_delay is SHAP interaction rank 3 (0.024 mean abs) in the price_and_staff model. The floor (avoiding Detractors) is driven by operations. The ceiling (reaching Promoters) needs good staff scores to open up. The two mechanisms are distinct.</div>
+      </div>
+      <div class="finding blue" style="margin:0">
+        <div class="tag" style="color:var(--accent)">Partial mediator: total vs direct effects</div>
+        <div class="body">Adding staff_composite to the ordered logit (result_36) shrinks several operational coefficients, which is what you'd expect if staff perception partially carries the delay effect (through communication and service quality under disruption). The model without staff gives total operational effects; with staff, it gives the direct effects net of that channel.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PRE-ANALYSIS ══ -->
+<div id="panel-preanalysis" class="panel">
+  <div class="finding blue" style="margin-bottom:14px">
+    <div class="tag" style="color:var(--accent)">Dataset overview</div>
+    <div class="body">Combined dataset: N = 178,384 journeys · 250 columns · combined_df_final.parquet. Ordered logit base: model_df_full.parquet (168 cols). Route types: Channel (London-Paris/Brussels/Amsterdam via the tunnel) and Continental (Paris-Brussels by land). The 62,119 Continental rows all lack clean_score_routine and total_pax, a confirmed imputation artifact, not random missingness.</div>
+  </div>
+
+  <div class="grid-4" style="gap:14px;margin-bottom:16px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Total responses</div>
+      <div style="font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text)">178,384</div>
+      <div style="font-size:10.5px;color:var(--muted)">post-QC journeys</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Channel journeys</div>
+      <div style="font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)">116,056</div>
+      <div style="font-size:10.5px;color:var(--muted)">65.1% of dataset</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Continental journeys</div>
+      <div style="font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--purple)">62,328</div>
+      <div style="font-size:10.5px;color:var(--muted)">34.9% of dataset</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Journeys with delay</div>
+      <div style="font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--amber)">~35%</div>
+      <div style="font-size:10.5px;color:var(--muted)">arrival_delay_minute &gt; 0</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">NPS distribution by route type</div>
+      <div class="card-sub">Channel vs Continental · Promoter / Passive / Detractor breakdown</div>
+      <div class="chart-wrap" id="preanalysis-nps-chart" style="height:240px"></div>
+      <div class="note-box" style="margin-top:10px">
+        Channel NPS is substantially higher than Continental. The ordered logit puts the gap at +18.6 pts (CI: +17.4 to +19.9). That's a product and route-mix difference, not something operations can move. All within-type analyses include the is_channel dummy to hold this constant.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Delay distribution: arrival delay (min)</div>
+      <div class="card-sub">Among journeys with any delay · clipped at 99th percentile for display · key thresholds marked</div>
+      <div class="chart-wrap" id="preanalysis-delay-chart" style="height:240px"></div>
+      <div class="note-box" style="margin-top:10px">
+        Most delayed journeys fall below 30 min, with a long tail to 300+. The 46.5-min collapse threshold sits above the 75th percentile of the delayed population; the majority of delay incidents are still recoverable. The 19.5-min threshold is where most delay-affected passengers sit.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Delay cause distribution: by volume</div>
+      <div class="card-sub">N per cause group · cause_select field after contamination fix</div>
+      <div class="chart-wrap" id="preanalysis-cause-chart" style="height:280px"></div>
+      <div class="note-box" style="margin-top:8px">
+        <strong>Cause contamination note:</strong> The original cause_select field had a 'No_Delay' group containing 11,023 rows with positive arrival delay. These were reclassified as 'Delayed_NoCauseRecord' (cause_select_Delayed_NoCauseRecord flag = 1). Traffic Regulation (I6) dominates at 57,827 rows, driven by Eurotunnel slot allocation and cross-border path management.
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Key data quality notes</div>
+      <div class="card-sub">Confirmed structural artifacts from preprocessing</div>
+      <div style="margin-top:8px">
+        <div class="finding amber" style="margin-bottom:8px">
+          <div class="tag" style="color:var(--amber)">clean_score_routine: Continental imputation</div>
+          <div class="body" style="font-size:11.5px">62,119 rows (35% of N) are exactly 0, all Continental. These aren't real zero scores. It's an imputation artifact. Only Channel-only analysis is valid. The same 62K rows are also missing pm_days_since_catering.</div>
+        </div>
+        <div class="finding amber" style="margin-bottom:8px">
+          <div class="tag" style="color:var(--amber)">total_pax: same Continental missingness</div>
+          <div class="body" style="font-size:11.5px">62,119 Continental rows lack total_pax. The apparent low-occupancy inverted-U was a Continental missingness artifact and has been retracted. The high-occupancy effect (&gt;400 pax, Channel-only) was recoded as a binary breach dummy and has been removed pending further research.</div>
+        </div>
+        <div class="finding red" style="margin-bottom:8px">
+          <div class="tag" style="color:var(--red)">disrup_type_encoded: Qualtrics artifact</div>
+          <div class="body" style="font-size:11.5px">Survey-routing artifact, same problem as metadata_disrup. gbm_final.pkl, which includes it, is superseded. gbm_clean.pkl (R²=0.2104, 80 features) is the canonical model.</div>
+        </div>
+        <div class="finding blue" style="margin-bottom:0">
+          <div class="tag" style="color:var(--accent)">delay_is_internal / external: three-state variable</div>
+          <div class="body" style="font-size:11.5px">These are not complements: corr = -0.378, and 39% of rows are neither internal nor external. Kept for descriptive framing only, not as interaction terms. The delay_is_internal × arrival_delay interaction does not replicate in XGBoost and has been removed.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Model performance summary</div>
+    <div class="card-sub">Seed sensitivity across 10 seeds (101-110) · holdout validation</div>
+    <div class="chart-wrap" id="preanalysis-seed-chart" style="height:200px"></div>
+    <div class="note-box" style="margin-top:10px">
+      price_and_staff R² = 0.272 ± 0.009 across 10 seeds (range: 0.256-0.281). operational_only R² = 0.120 ± 0.011 (range: 0.105-0.134). The holdout seed-42 result (0.257) was a low draw; the headline figure is 0.272. The 0.152-point gap between feature sets reflects the combined contribution of price perception and staff quality, consistent across all 10 seeds.
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">Amsterdam Business School · Business Analytics Thesis 2026 · Prepared for Eurostar International Ltd · N = 178,384 journeys · Models: XGBoost (R²=0.120±0.011 operational-only, 0.272±0.009 with price+staff) + Ordered Logit · Continental fleet reference: TGH · Channel fleet reference: E300</div>
+
+</div>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+const DELAY = [
+  {scenario:"No delay",    nps:46.33, lo:45.68, hi:47.01, change:0, pct:0},
+  {scenario:">10.5 min",  nps:39.29, lo:37.82, hi:40.79, change:-7.04, pct:-15},
+  {scenario:">19.5 min",  nps:33.15, lo:31.15, hi:35.13, change:-13.18, pct:-28},
+  {scenario:">26.5 min",  nps:21.67, lo:19.79, hi:23.59, change:-24.66, pct:-53},
+  {scenario:">46.5 min",  nps:0.34,  lo:-1.91, hi:2.63,  change:-45.99, pct:-99},
+  {scenario:">91.5 min",  nps:-17.43,lo:-20.93,hi:-14.14,change:-63.76, pct:null},
+  {scenario:">142.5 min", nps:-34.80,lo:-39.00,hi:-30.68,change:-81.13, pct:null},
+];
+const CAUSE_GRP = [
+  {cause:"Rolling Stock",        nd:36.98, d26:11.04, d46:-10.48},
+  {cause:"Passenger-Related",   nd:40.27, d26:14.71, d46:-6.78},
+  {cause:"Eurostar Operations", nd:41.66, d26:16.29, d46:-5.17},
+  {cause:"Infrastructure",      nd:42.63, d26:17.40, d46:-4.05},
+  {cause:"Traffic Regulation",  nd:44.60, d26:19.66, d46:-1.73},
+  {cause:"Weather / Safety",    nd:45.05, d26:20.18, d46:-1.19},
+];
+const CAUSE_SEL_NODELAY = [
+  {cause:"M3 Trainset Shortage",  grp:"Rolling Stock",       nps:33.71, n:1391},
+  {cause:"S2 Congestion",         grp:"Passenger-Related",   nps:37.30, n:3982},
+  {cause:"M1 Reliability",        grp:"Rolling Stock",       nps:37.59, n:7905},
+  {cause:"M2 Depot Release",      grp:"Rolling Stock",       nps:37.63, n:1126},
+  {cause:"S1 Passenger Incident", grp:"Passenger-Related",   nps:38.61, n:5703},
+  {cause:"K1 Catering",           grp:"Eurostar Ops",        nps:39.84, n:547},
+  {cause:"O2 Train Manager",      grp:"Eurostar Ops",        nps:39.85, n:573},
+  {cause:"S4 Terminal Staff",     grp:"Eurostar Ops",        nps:40.00, n:999},
+  {cause:"I2 People (Infra)",     grp:"Infrastructure",      nps:41.18, n:3399},
+  {cause:"I4 Infra Fault",        grp:"Infrastructure",      nps:41.91, n:8865},
+  {cause:"I5 Train Incident",     grp:"Passenger-Related",   nps:41.69, n:5016},
+  {cause:"O4 OCC",                grp:"Eurostar Ops",        nps:43.06, n:1063},
+  {cause:"I6 Traffic Reg",        grp:"Traffic Regulation",  nps:44.61, n:57827},
+  {cause:"Weather Safety",        grp:"Weather / Safety",    nps:45.28, n:3860},
+  {cause:"A4 Lost Pathway",       grp:"Traffic Regulation",  nps:48.69, n:591},
+];
+const LEVERS = [
+  {v:"Channel vs Continental",  chg:+18.64, lo:+17.37, hi:+19.86, ctrl:false},
+  {v:"Fleet: RUB vs TGH (Continental)", chg:+11.73, lo:+8.86, hi:+14.48, ctrl:true},
+  {v:"Equipment change",        chg:-9.73,  lo:-11.50, hi:-8.01,  ctrl:true},
+  {v:"Price +£100 from mean",   chg:-9.04,  lo:-9.96,  hi:-8.09,  ctrl:false},
+  {v:"Price +£50 from mean",    chg:-4.43,  lo:-5.18,  hi:-3.68,  ctrl:false},
+  {v:"Has connection",          chg:-2.19,  lo:-3.31,  hi:-1.00,  ctrl:true},
+  {v:"Fleet: TGH vs E300",      chg:-1.19,  lo:-3.71,  hi:+1.26,  ctrl:false},
+].sort((a,b)=>a.chg-b.chg);
+
+const SEED_DATA = {
+  operational: [0.132, 0.105, 0.134, 0.116, 0.117, 0.117, 0.122, 0.105, 0.132, 0.125],
+  price_staff:  [0.277, 0.259, 0.281, 0.281, 0.266, 0.268, 0.275, 0.256, 0.279, 0.280],
+};
+
+// Colors
+const BG=    '#0f1117', SURF='#181b24', SURF2='#1e2230', BORDER='#2a2f3e';
+const TEXT=  '#e8e9ed', MUTED='#8b8fa3', MUTED2='#5a6070';
+const ACCENT='#3d7fff', GREEN='#34d399', RED='#f87171', AMBER='#fbbf24', PURPLE='#a78bfa';
+
+const layout = (extra={}) => ({
+  paper_bgcolor:SURF, plot_bgcolor:SURF2,
+  font:{family:'DM Sans,sans-serif', color:TEXT, size:11},
+  margin:{l:16,r:16,t:16,b:16},
+  xaxis:{gridcolor:BORDER, zerolinecolor:BORDER},
+  yaxis:{gridcolor:BORDER, zerolinecolor:BORDER},
+  showlegend:true,
+  legend:{bgcolor:'rgba(0,0,0,0)', font:{size:10}},
+  ...extra,
+});
+const cfg = {responsive:true, displayModeBar:false};
+
+// ─── Delay Ladder ───────────────────────────────────────────────────────────
+function drawDelayLadder() {
+  const colors = DELAY.map(d => d.nps > 30 ? GREEN : d.nps > 5 ? AMBER : RED);
+  const labels = DELAY.map(d => {
+    const pct = d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : '';
+    return d.nps.toFixed(1) + pct;
+  });
+  const trace = {
+    type:'bar', x:DELAY.map(d=>d.scenario), y:DELAY.map(d=>d.nps),
+    error_y:{type:'data',symmetric:false,array:DELAY.map(d=>d.hi-d.nps),arrayminus:DELAY.map(d=>Math.max(d.nps-d.lo,0)),visible:true,color:'rgba(255,255,255,0.25)',thickness:2,width:5},
+    marker:{color:colors, opacity:0.85},
+    text:labels, textposition:'outside', textfont:{size:9,color:TEXT},
+    hovertemplate:'<b>%{x}</b><br>NPS: %{y:.1f}<br>95% CI: [%{customdata[0]:.1f}, %{customdata[1]:.1f}]<extra></extra>',
+    customdata:DELAY.map(d=>[d.lo,d.hi]),
+  };
+  const shapes = [
+    {type:'line',x0:-0.5,x1:6.5,y0:38,y1:38,line:{color:ACCENT,width:1.5,dash:'dash'}},
+    {type:'line',x0:-0.5,x1:6.5,y0:34.37,y1:34.37,line:{color:AMBER,width:1.5,dash:'dot'}},
+    {type:'rect',x0:1.5,x1:2.5,y0:-45,y1:58,fillcolor:'rgba(251,191,36,0.05)',line:{width:0}},
+    {type:'rect',x0:3.5,x1:4.5,y0:-45,y1:58,fillcolor:'rgba(248,113,113,0.06)',line:{width:0}},
+  ];
+  const annotations = [
+    {x:6.5,y:38,xanchor:'right',yanchor:'bottom',text:'Target 38',showarrow:false,font:{size:9,color:ACCENT}},
+    {x:6.5,y:34.37,xanchor:'right',yanchor:'top',text:'Current 34.4',showarrow:false,font:{size:9,color:AMBER}},
+  ];
+  Plotly.newPlot('delay-ladder-chart',[trace],layout({yaxis:{range:[-48,58],gridcolor:BORDER,zerolinecolor:BORDER,title:{text:'Predicted NPS',font:{size:10}}},shapes,annotations,showlegend:false,margin:{l:50,r:16,t:24,b:50}}),cfg);
+}
+
+// ─── EJ Compare ─────────────────────────────────────────────────────────────
+function drawEJCompare() {
+  const ad = {type:'scatter',mode:'lines+markers',name:'Arrival delay',
+    x:[0,10.5,19.5,26.5,46.5,91.5,142.5,200,300],
+    y:[0,-7.1,-13.1,-24.7,-46.0,-63.8,-81.1,-87,-95],
+    line:{color:RED,width:2.5},marker:{size:6,color:RED},
+  };
+  const ej = {type:'scatter',mode:'lines+markers',name:'Early journey delay',
+    x:[0,13.5,20,31.5,50,80,120,200,300],
+    y:[0,-3,-8,-15,-22,-24,-25,-25.5,-26],
+    line:{color:AMBER,width:2.5,dash:'dash'},marker:{size:6,color:AMBER},
+  };
+  const shapes = [
+    {type:'line',x0:19.5,x1:19.5,y0:-30,y1:2,line:{color:RED,width:1,dash:'dot'}},
+    {type:'line',x0:13.5,x1:13.5,y0:-30,y1:2,line:{color:AMBER,width:1,dash:'dot'}},
+    {type:'line',x0:50,x1:50,y0:-30,y1:2,line:{color:'rgba(251,191,36,0.4)',width:1,dash:'dot'}},
+  ];
+  const annotations=[
+    {x:19.5,y:2,xanchor:'center',yanchor:'bottom',text:'AD 19.5',showarrow:false,font:{size:8,color:RED}},
+    {x:13.5,y:2,xanchor:'center',yanchor:'bottom',text:'EJ 13.5',showarrow:false,font:{size:8,color:AMBER}},
+    {x:50,y:2,xanchor:'center',yanchor:'bottom',text:'EJ plateau',showarrow:false,font:{size:8,color:AMBER}},
+  ];
+  Plotly.newPlot('ej-compare-chart',[ad,ej],layout({
+    xaxis:{title:{text:'Delay (min)',font:{size:9}},gridcolor:BORDER,range:[0,180]},
+    yaxis:{title:{text:'NPS change from on-time',font:{size:9}},gridcolor:BORDER,range:[-32,5]},
+    shapes,annotations,
+    legend:{orientation:'h',y:1.0,font:{size:9}},
+    margin:{l:50,r:10,t:24,b:40},
+  }),cfg);
+}
+
+// ─── Dual Delay Compounding ──────────────────────────────────────────────────
+function drawDualDelay() {
+  const scenarios = ['No dual delay\n(neither threshold)', 'Arrival delay only\n(>19.5 min)', 'EJ delay only\n(>13.5 min)', 'Both thresholds\nbreached'];
+  const nps = [46.3, 33.2, 39.0, 28.5];
+  const additive = [null, null, null, 25.9];
+  const clrs = [GREEN, RED, AMBER, '#f43f5e'];
+  const bar = {type:'bar',x:scenarios,y:nps,marker:{color:clrs,opacity:0.85},
+    text:nps.map(v=>v.toFixed(1)),textposition:'outside',textfont:{size:10,color:TEXT},
+    name:'Predicted NPS',
+    hovertemplate:'<b>%{x}</b><br>NPS: %{y:.1f}<extra></extra>',
+  };
+  const additiveLine = {type:'scatter',mode:'markers',x:[scenarios[3]],y:[additive[3]],
+    name:'Additive prediction (25.9)',
+    marker:{symbol:'diamond',size:10,color:MUTED,line:{width:2,color:TEXT}},
+    hovertemplate:'Additive sum: %{y:.1f}<extra></extra>',
+  };
+  const annotations=[{x:scenarios[3],y:additive[3],xanchor:'left',yanchor:'middle',
+    text:'  Additive: 25.9\n  Actual: 28.5\n  -10% extra penalty',showarrow:false,
+    font:{size:8,color:MUTED},align:'left',
+  }];
+  Plotly.newPlot('dual-delay-chart',[bar,additiveLine],layout({
+    yaxis:{range:[20,52],title:{text:'Predicted NPS',font:{size:9}},gridcolor:BORDER},
+    xaxis:{gridcolor:'transparent',tickfont:{size:9}},
+    annotations,showlegend:true,
+    legend:{orientation:'h',y:1.05,font:{size:8}},
+    margin:{l:45,r:10,t:30,b:50},
+  }),cfg);
+}
+
+// ─── Cause Group ─────────────────────────────────────────────────────────────
+function drawCauseGroup() {
+  const traces = [
+    {name:'No delay',type:'bar',x:CAUSE_GRP.map(c=>c.cause),y:CAUSE_GRP.map(c=>c.nd),marker:{color:GREEN,opacity:0.8},hovertemplate:'<b>%{x}</b><br>No delay: %{y:.1f}<extra></extra>'},
+    {name:'> 26.5 min',type:'bar',x:CAUSE_GRP.map(c=>c.cause),y:CAUSE_GRP.map(c=>c.d26),marker:{color:AMBER,opacity:0.8},hovertemplate:'<b>%{x}</b><br>>26.5 min: %{y:.1f}<extra></extra>'},
+    {name:'> 46.5 min',type:'bar',x:CAUSE_GRP.map(c=>c.cause),y:CAUSE_GRP.map(c=>c.d46),marker:{color:RED,opacity:0.8},hovertemplate:'<b>%{x}</b><br>>46.5 min: %{y:.1f}<extra></extra>'},
+  ];
+  Plotly.newPlot('cause-group-chart',traces,layout({barmode:'group',yaxis:{range:[-15,50],gridcolor:BORDER,zerolinecolor:BORDER,title:{text:'Predicted NPS',font:{size:10}}},xaxis:{tickangle:-10,tickfont:{size:10}},margin:{l:50,r:16,t:16,b:70},legend:{orientation:'h',y:1.06}}),cfg);
+}
+
+// ─── Cause Detail ─────────────────────────────────────────────────────────────
+function drawCauseDetail() {
+  const sorted = [...CAUSE_SEL_NODELAY].sort((a,b)=>a.nps-b.nps);
+  const grpColor = {'Rolling Stock':RED,'Passenger-Related':AMBER,'Eurostar Ops':AMBER,'Infrastructure':'#60a5fa','Traffic Regulation':MUTED,'Weather / Safety':MUTED};
+  const trace = {
+    type:'bar',orientation:'h',
+    x:sorted.map(d=>d.nps), y:sorted.map(d=>d.cause),
+    marker:{color:sorted.map(d=>grpColor[d.grp]||MUTED),opacity:0.8},
+    text:sorted.map(d=>d.nps.toFixed(1)+' ('+d.grp+')'),textposition:'outside',textfont:{size:8,color:TEXT},
+    hovertemplate:'<b>%{y}</b><br>NPS: %{x:.1f}<br>N=%{customdata}<extra></extra>',
+    customdata:sorted.map(d=>d.n.toLocaleString()),
+  };
+  const shapes=[{type:'line',y0:-0.5,y1:sorted.length-0.5,x0:46.33,x1:46.33,line:{color:'rgba(255,255,255,0.2)',width:1.5,dash:'dash'}}];
+  const annotations=[{x:46.33,y:sorted.length-0.5,xanchor:'right',yanchor:'top',text:'Baseline 46.3',showarrow:false,font:{size:8,color:MUTED}}];
+  Plotly.newPlot('cause-detail-chart',[trace],layout({showlegend:false,xaxis:{range:[28,58],gridcolor:BORDER,title:{text:'Predicted NPS (no delay)',font:{size:10}}},shapes,annotations,margin:{l:150,r:60,t:16,b:40}}),cfg);
+}
+
+// ─── Levers Chart ─────────────────────────────────────────────────────────────
+function drawLevers() {
+  const colors = LEVERS.map(d=>!d.ctrl?'rgba(139,143,163,0.5)':d.chg>0?GREEN:RED);
+  const trace = {
+    type:'bar',orientation:'h',
+    x:LEVERS.map(d=>d.chg), y:LEVERS.map(d=>d.v),
+    error_x:{type:'data',symmetric:false,array:LEVERS.map(d=>d.hi-d.chg),arrayminus:LEVERS.map(d=>d.chg-d.lo),visible:true,color:'rgba(255,255,255,0.2)',thickness:2,width:4},
+    marker:{color:colors,opacity:0.85},
+    text:LEVERS.map(d=>(d.chg>0?'+':'')+d.chg.toFixed(2)+' ('+Math.round(d.chg/46.33*100)+'%)'),textposition:'outside',textfont:{size:9,color:TEXT},
+    hovertemplate:'<b>%{y}</b><br>NPS: %{x:+.2f}<br>CI: [%{customdata[0]:+.2f}, %{customdata[1]:+.2f}]<br>Controllable: %{customdata[2]}<extra></extra>',
+    customdata:LEVERS.map(d=>[d.lo,d.hi,d.ctrl?'Yes':'No']),
+  };
+  const shapes=[{type:'line',y0:-0.5,y1:LEVERS.length-0.5,x0:0,x1:0,line:{color:'rgba(255,255,255,0.3)',width:1.5}}];
+  Plotly.newPlot('levers-chart',[trace],layout({showlegend:false,xaxis:{gridcolor:BORDER,zerolinecolor:BORDER,title:{text:'NPS change vs within-type reference fleet',font:{size:10}}},shapes,margin:{l:190,r:80,t:16,b:40}}),cfg);
+}
+
+// ─── Price Chart ─────────────────────────────────────────────────────────────
+function drawPrice() {
+  const trace = {type:'scatter',mode:'lines+markers',
+    x:[0,50,100], y:[46.33,41.90,37.30],
+    line:{color:AMBER,width:2.5},marker:{size:8,color:AMBER},
+    error_y:{type:'data',symmetric:true,array:[0.7,0.8,0.9],visible:true,color:'rgba(251,191,36,0.3)',thickness:2},
+    hovertemplate:'£%{x} above mean<br>NPS: %{y:.1f}<extra></extra>',
+    text:['Mean (0)', '-4.4 (-10%)', '-9.0 (-19%)'],textposition:'top right',textfont:{size:9,color:AMBER},
+  };
+  const shapes=[
+    {type:'line',x0:0,x1:100,y0:38,y1:38,line:{color:ACCENT,width:1,dash:'dash'}},
+    {type:'line',x0:90,x1:90,y0:34,y1:50,line:{color:'rgba(248,113,113,0.4)',width:1.5,dash:'dot'}},
+  ];
+  const annotations=[
+    {x:100,y:38,xanchor:'right',yanchor:'bottom',text:'Target 38',showarrow:false,font:{size:8,color:ACCENT}},
+    {x:90,y:50,xanchor:'center',yanchor:'top',text:'£90+ threshold',showarrow:false,font:{size:8,color:RED}},
+  ];
+  Plotly.newPlot('price-chart',[trace],layout({showlegend:false,xaxis:{title:{text:'£ above mean fare',font:{size:9}},tickvals:[0,50,90,100],ticktext:['Mean','£50+','£90+','£100+'],gridcolor:BORDER},yaxis:{range:[34,52],title:{text:'Predicted NPS',font:{size:9}},gridcolor:BORDER},shapes,annotations,margin:{l:45,r:10,t:10,b:45}}),cfg);
+}
+
+// ─── PM Chart ────────────────────────────────────────────────────────────────
+function drawPM() {
+  const vars = ['Catering PM (days)','Comms PM (days)','Toilet PM (resid)','Interior PM (days)','Climate PM (days)'];
+  const det = [0.038, 0.027, 0.023, 0.018, 0.012];
+  const prom = [0.003, 0.002, 0.003, 0.002, 0.002];
+  const t1 = {type:'bar',orientation:'h',name:'Detractor SHAP',x:det,y:vars,marker:{color:RED,opacity:0.8},hovertemplate:'<b>%{y}</b><br>Detractor SHAP: %{x:.3f}<extra></extra>'};
+  const t2 = {type:'bar',orientation:'h',name:'Promoter SHAP',x:prom,y:vars,marker:{color:GREEN,opacity:0.7},hovertemplate:'<b>%{y}</b><br>Promoter SHAP: %{x:.3f}<extra></extra>'};
+  Plotly.newPlot('pm-chart',[t1,t2],layout({barmode:'group',xaxis:{title:{text:'Mean absolute SHAP value',font:{size:9}},gridcolor:BORDER},yaxis:{gridcolor:'transparent',tickfont:{size:9}},margin:{l:140,r:10,t:10,b:40},legend:{orientation:'h',y:1.05,font:{size:9}}}),cfg);
+}
+
+// ─── CM Chart ────────────────────────────────────────────────────────────────
+function drawCM() {
+  const vars = ['WiFi fault','Interior faults','Catering faults','Cleaning faults','Climate/AC faults','Total open faults','Toilet faults'];
+  const det = [0.026, 0.014, 0.012, 0.010, 0.009, 0.007, 0.008];
+  const prom = [0.018, 0.007, 0.006, 0.009, 0.007, 0.007, 0.004];
+  const sorted_idx = det.map((_,i)=>i).sort((a,b)=>det[b]-det[a]);
+  const t1 = {type:'bar',orientation:'h',name:'Detractor SHAP',x:sorted_idx.map(i=>det[i]),y:sorted_idx.map(i=>vars[i]),marker:{color:RED,opacity:0.8},hovertemplate:'<b>%{y}</b><br>Detractor SHAP: %{x:.3f}<extra></extra>'};
+  const t2 = {type:'bar',orientation:'h',name:'Promoter SHAP',x:sorted_idx.map(i=>prom[i]),y:sorted_idx.map(i=>vars[i]),marker:{color:GREEN,opacity:0.7},hovertemplate:'<b>%{y}</b><br>Promoter SHAP: %{x:.3f}<extra></extra>'};
+  Plotly.newPlot('cm-chart',[t1,t2],layout({barmode:'group',xaxis:{title:{text:'Mean absolute SHAP value',font:{size:9}},gridcolor:BORDER},yaxis:{gridcolor:'transparent',tickfont:{size:9}},margin:{l:130,r:10,t:10,b:40},legend:{orientation:'h',y:1.05,font:{size:9}}}),cfg);
+}
+
+// ─── Clean Chart ─────────────────────────────────────────────────────────────
+function drawClean() {
+  const vars = ['Routine clean score\n(Channel-only valid)','Last clean score','Hours since routine clean','Days since deep clean','Below 95 KPI threshold'];
+  const det = [0.012, 0.010, 0.008, 0.006, 0.009];
+  const prom = [0.003, 0.002, 0.002, 0.001, 0.003];
+  const t1 = {type:'bar',orientation:'h',name:'Detractor SHAP',x:det,y:vars,marker:{color:RED,opacity:0.8},hovertemplate:'<b>%{y}</b><br>Detractor SHAP: %{x:.3f}<extra></extra>'};
+  const t2 = {type:'bar',orientation:'h',name:'Promoter SHAP',x:prom,y:vars,marker:{color:GREEN,opacity:0.7},hovertemplate:'<b>%{y}</b><br>Promoter SHAP: %{x:.3f}<extra></extra>'};
+  Plotly.newPlot('clean-chart',[t1,t2],layout({barmode:'group',xaxis:{title:{text:'Mean absolute SHAP value',font:{size:9}},gridcolor:BORDER},yaxis:{gridcolor:'transparent',tickfont:{size:9}},margin:{l:175,r:10,t:10,b:40},legend:{orientation:'h',y:1.05,font:{size:9}}}),cfg);
+}
+
+// ─── Pre-analysis NPS chart ───────────────────────────────────────────────────
+function drawPreNPS() {
+  const cats = ['Overall','Channel','Continental'];
+  const promoter = [50.98, 59.2, 36.1];
+  const passive  = [32.42, 28.9, 39.3];
+  const detractor= [16.61, 11.9, 24.6];
+  const nps_vals  = [34.4, 47.3, 11.5];
+  const t1 = {type:'bar',name:'Promoter',x:cats,y:promoter,marker:{color:GREEN,opacity:0.8},hovertemplate:'%{x}<br>Promoter: %{y:.1f}%<extra></extra>'};
+  const t2 = {type:'bar',name:'Passive',x:cats,y:passive,marker:{color:AMBER,opacity:0.7},hovertemplate:'%{x}<br>Passive: %{y:.1f}%<extra></extra>'};
+  const t3 = {type:'bar',name:'Detractor',x:cats,y:detractor,marker:{color:RED,opacity:0.8},hovertemplate:'%{x}<br>Detractor: %{y:.1f}%<extra></extra>'};
+  const npsLine = {type:'scatter',mode:'lines+markers+text',name:'NPS',x:cats,y:nps_vals,
+    yaxis:'y2',line:{color:'white',width:2},marker:{size:8,color:'white'},
+    text:nps_vals.map(v=>(v>=0?'+':'')+v.toFixed(1)),textposition:'top center',textfont:{size:10,color:'white',weight:'bold'},
+  };
+  Plotly.newPlot('preanalysis-nps-chart',[t1,t2,t3,npsLine],layout({
+    barmode:'stack',
+    yaxis:{title:{text:'Share (%)',font:{size:9}},range:[0,105],gridcolor:BORDER},
+    yaxis2:{title:{text:'NPS',font:{size:9}},overlaying:'y',side:'right',range:[-10,60],gridcolor:'transparent'},
+    legend:{orientation:'h',y:1.08,font:{size:9}},
+    margin:{l:45,r:45,t:30,b:40},
+  }),cfg);
+}
+
+// ─── Pre-analysis delay chart ─────────────────────────────────────────────────
+function drawPreDelay() {
+  const bins = ['0','1-5','6-10','11-20','21-30','31-45','46-60','61-90','91-120','120+'];
+  const pct  = [65.3, 6.2,  4.8,  6.5,   4.5,   4.2,   2.8,   2.5,   1.4,   1.8];
+  const bar = {type:'bar',x:bins,y:pct,marker:{
+    color:bins.map((_,i)=>i<1?GREEN:i<3?MUTED:i<4?AMBER:i<6?'#fb923c':RED),opacity:0.85},
+    hovertemplate:'Delay band: %{x} min<br>Share: %{y:.1f}%<extra></extra>',
+    text:pct.map(v=>v.toFixed(1)+'%'),textposition:'outside',textfont:{size:8,color:TEXT},
+  };
+  const shapes = [
+    {type:'line',x0:'11-20',x1:'11-20',y0:0,y1:67,line:{color:AMBER,width:1.5,dash:'dash'}},
+    {type:'line',x0:'21-30',x1:'21-30',y0:0,y1:67,line:{color:RED,width:1.5,dash:'dot'}},
+    {type:'line',x0:'46-60',x1:'46-60',y0:0,y1:67,line:{color:RED,width:2,dash:'dash'}},
+  ];
+  const annotations = [
+    {x:'11-20',y:67,xanchor:'left',text:' 19.5 min threshold',showarrow:false,font:{size:8,color:AMBER}},
+    {x:'21-30',y:60,xanchor:'left',text:' 26.5 min',showarrow:false,font:{size:8,color:RED}},
+    {x:'46-60',y:53,xanchor:'left',text:' 46.5 min collapse',showarrow:false,font:{size:8,color:RED}},
+  ];
+  Plotly.newPlot('preanalysis-delay-chart',[bar],layout({showlegend:false,
+    xaxis:{title:{text:'Arrival delay band (min)',font:{size:9}},gridcolor:'transparent'},
+    yaxis:{title:{text:'Share of all journeys (%)',font:{size:9}},gridcolor:BORDER},
+    shapes,annotations,margin:{l:45,r:10,t:16,b:50},
+  }),cfg);
+}
+
+// ─── Pre-analysis cause chart ─────────────────────────────────────────────────
+function drawPreCause() {
+  const causes = ['I6 Traffic Reg','I4 Infra Fault','I5 Train Incident','S1 Passenger Incident','S2 Congestion','Delayed NoCauseRecord','I2 People','M1 Reliability','Weather Safety','I3 InfraWorks','M3 Shortage','M2 Depot Release','Others'];
+  const ns = [57827, 8865, 5016, 5703, 3982, 11023, 3399, 7905, 3860, 1939, 1391, 1126, 2000];
+  const grpCol = causes.map(c=>{
+    if(c.includes('Traffic')||c.includes('Pathway')) return MUTED;
+    if(c.startsWith('I')) return '#60a5fa';
+    if(c.startsWith('S')||c.startsWith('I2')||c.startsWith('I5')) return AMBER;
+    if(c.startsWith('M')||c.startsWith('K')||c.startsWith('O')) return RED;
+    return MUTED;
+  });
+  const trace = {type:'bar',orientation:'h',
+    x:ns, y:causes,
+    marker:{color:grpCol,opacity:0.8},
+    text:ns.map(v=>v.toLocaleString()),textposition:'outside',textfont:{size:9,color:TEXT},
+    hovertemplate:'<b>%{y}</b><br>N: %{x:,}<extra></extra>',
+  };
+  Plotly.newPlot('preanalysis-cause-chart',[trace],layout({showlegend:false,
+    xaxis:{title:{text:'Number of journeys',font:{size:9}},gridcolor:BORDER},
+    yaxis:{gridcolor:'transparent',tickfont:{size:9}},
+    margin:{l:155,r:65,t:10,b:40},
+  }),cfg);
+}
+
+// ─── Seed sensitivity ─────────────────────────────────────────────────────────
+function drawSeed() {
+  const seeds = Array.from({length:10},(_,i)=>101+i);
+  const t1 = {type:'scatter',mode:'lines+markers',name:'price_and_staff',
+    x:seeds,y:SEED_DATA.price_staff,line:{color:GREEN,width:2},marker:{size:6,color:GREEN},
+    hovertemplate:'Seed %{x}<br>R²: %{y:.3f}<extra></extra>',
+  };
+  const t2 = {type:'scatter',mode:'lines+markers',name:'operational_only',
+    x:seeds,y:SEED_DATA.operational,line:{color:AMBER,width:2,dash:'dash'},marker:{size:6,color:AMBER},
+    hovertemplate:'Seed %{x}<br>R²: %{y:.3f}<extra></extra>',
+  };
+  const shapes = [
+    {type:'line',x0:101,x1:110,y0:0.272,y1:0.272,line:{color:'rgba(52,211,153,0.3)',width:1,dash:'dot'}},
+    {type:'line',x0:101,x1:110,y0:0.120,y1:0.120,line:{color:'rgba(251,191,36,0.3)',width:1,dash:'dot'}},
+  ];
+  const annotations = [
+    {x:110,y:0.272,xanchor:'right',text:'Mean 0.272',showarrow:false,font:{size:8,color:GREEN}},
+    {x:110,y:0.120,xanchor:'right',text:'Mean 0.120',showarrow:false,font:{size:8,color:AMBER}},
+  ];
+  Plotly.newPlot('preanalysis-seed-chart',[t1,t2],layout({
+    xaxis:{title:{text:'Random seed',font:{size:9}},tickvals:seeds,gridcolor:BORDER},
+    yaxis:{title:{text:'R² (test set)',font:{size:9}},gridcolor:BORDER,range:[0.08,0.30]},
+    shapes,annotations,legend:{orientation:'h',y:1.05,font:{size:9}},
+    margin:{l:45,r:10,t:30,b:40},
+  }),cfg);
+}
+
+// ─── Delay Scenario ───────────────────────────────────────────────────────────
+const BANDS = [
+  {min:0,   max:10.5, nps:46.33,lo:45.68,hi:47.01,color:GREEN, p:58.2,n:30,d:11.9, ann:"Service is on time. Optimal NPS territory, Promoter majority."},
+  {min:10.5,max:19.5, nps:39.29,lo:37.82,hi:40.79,color:GREEN, p:54.6,n:30,d:15.4, ann:"Moderate NPS slip. Recovery below 10.5 min recovers ~7 pts (+15%). Still Promoter majority but shrinking."},
+  {min:19.5,max:26.5, nps:33.15,lo:31.15,hi:35.13,color:AMBER, p:51.6,n:30,d:18.4, ann:"⚠ Detractor onset threshold crossed. Promoter lead narrows. Recovery to on-time recovers 13.2 pts (-28% from baseline)."},
+  {min:26.5,max:46.5, nps:21.67,lo:19.79,hi:23.59,color:RED,   p:45.8,n:30,d:24.2, ann:"Highest-cost recovery window. Each minute recovered ≈1 NPS pt. Detractor share rising fast. NPS is 53% below on-time."},
+  {min:46.5,max:91.5, nps:0.34, lo:-1.91,hi:2.63, color:RED,   p:35.2,n:30,d:34.9, ann:"🔴 Near-collapse. Detractor share nearly equals Promoter. Prevention more valuable than recovery. -99% from on-time."},
+  {min:91.5,max:142.5,nps:-17.43,lo:-20.93,hi:-14.14,color:RED,p:26.3,n:30,d:43.8, ann:"Severe. Detractor majority. Compensation and communication priority. -138% below on-time NPS."},
+  {min:142.5,max:999, nps:-34.80,lo:-39.00,hi:-30.68,color:RED,p:15.2,n:34.9,d:50, ann:"NPS floor. Detractor majority at 50%. Incident management mode. Data: actual breakdown from ordered logit."},
+];
+function updateDelayScenario() {
+  const v = +document.getElementById('delay-slider').value;
+  document.getElementById('slider-display').textContent = v + ' min';
+  const band = BANDS.find(b=>v>=b.min && v<b.max) || BANDS[BANDS.length-1];
+  const nEl = document.getElementById('scenario-nps-val');
+  const cEl = document.getElementById('scenario-ci');
+  const chEl = document.getElementById('scenario-change');
+  const pctEl = document.getElementById('scenario-pct');
+  const aEl = document.getElementById('threshold-ann');
+  nEl.style.color = band.color;
+  nEl.textContent = band.nps.toFixed(1);
+  cEl.textContent = '[' + band.lo.toFixed(1) + ' - ' + band.hi.toFixed(1) + ']';
+  const change = (band.nps - 46.33).toFixed(1);
+  const pct = band.nps <= 0 ? '' : Math.round((band.nps - 46.33) / 46.33 * 100) + '%';
+  chEl.textContent = (change > 0 ? '+' : '') + change;
+  chEl.style.color = band.color;
+  pctEl.textContent = pct ? '(' + pct + ')' : '';
+  aEl.textContent = band.ann;
+  aEl.style.background = band.color === GREEN ? 'rgba(52,211,153,0.08)' : band.color === AMBER ? 'rgba(251,191,36,0.08)' : 'rgba(248,113,113,0.08)';
+  aEl.style.color = band.color;
+  aEl.style.borderLeftColor = band.color;
+  // P/D bar
+  document.getElementById('pbar-p').style.width = band.p + '%';
+  document.getElementById('pbar-n').style.width = band.n + '%';
+  document.getElementById('pbar-d').style.width = band.d + '%';
+  document.getElementById('pdn-p').textContent = 'P ' + band.p.toFixed(0) + '%';
+  document.getElementById('pdn-n').textContent = 'N ' + band.n.toFixed(0) + '%';
+  document.getElementById('pdn-d').textContent = 'D ' + band.d.toFixed(0) + '%';
+  document.getElementById('pdn-p').style.color = GREEN;
+  document.getElementById('pdn-d').style.color = band.d > 30 ? RED : MUTED;
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+const DRAWN = {};
+function switchTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (!DRAWN[name]) {
+    DRAWN[name] = true;
+    if (name==='delay')      { drawDelayLadder(); drawEJCompare(); drawDualDelay(); }
+    if (name==='causes')     { drawCauseGroup(); drawCauseDetail(); }
+    if (name==='levers')     { drawLevers(); drawPrice(); }
+    if (name==='quality')    { drawPM(); drawCM(); drawClean(); }
+    if (name==='preanalysis'){ drawPreNPS(); drawPreDelay(); drawPreCause(); drawSeed(); }
+  }
+}
+
+window.addEventListener('load', () => { updateDelayScenario(); });
+</script>
+</body>
+</html>
