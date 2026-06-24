@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Eurostar · NPS Operations Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#021F4B;--navy2:#0A2D63;--yellow:#FFDD00;--paper:#F5F7FA;--card:#FFFFFF;
+  --ink:#13213B;--muted:#5C6B85;--line:#E2E6ED;
+  --internal:#C0392B;--external:#2E75B6;--target:#2E7D32;--risk:#D64545;--amber:#E8A13A;--good:#2E7D32;
+}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:'Public Sans',sans-serif;font-size:15px;line-height:1.5}
+.mono{font-family:'JetBrains Mono',monospace}
+.topbar{position:sticky;top:0;z-index:50;background:var(--navy);color:#fff;border-bottom:4px solid var(--yellow)}
+.topbar-in{max-width:1300px;margin:0 auto;padding:13px 26px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.logo{font-family:'Archivo',sans-serif;font-weight:900;font-size:19px;letter-spacing:.04em}
+.logo span{color:var(--yellow)}
+.nav{display:flex;gap:2px;flex-wrap:wrap}
+.nav a{color:#C9D4E8;text-decoration:none;font-size:12.5px;font-weight:600;padding:7px 11px;border-radius:6px;border-bottom:3px solid transparent}
+.nav a:hover{color:#fff;background:rgba(255,255,255,.08)}
+.nav a:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.hero{background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);color:#fff;padding:42px 0 50px}
+.wrap{max-width:1300px;margin:0 auto;padding:0 26px}
+.hero h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(25px,3.3vw,36px);letter-spacing:-.01em;max-width:840px}
+.hero p{color:#B9C6DE;margin-top:9px;max-width:780px;font-size:14.5px}
+.track-card{margin-top:30px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:24px 28px}
+.track-label{display:flex;justify-content:space-between;font-size:12px;color:#B9C6DE;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.track{position:relative;height:13px;margin:30px 0 8px;border-radius:7px;background:linear-gradient(90deg,#D64545 0%,#E8A13A 45%,#2E7D32 76%,#2E7D32 100%)}
+.track::after{content:"";position:absolute;inset:0;border-radius:7px;background:repeating-linear-gradient(90deg,transparent 0 38px,rgba(2,31,75,.35) 38px 42px)}
+.train{position:absolute;top:-22px;transform:translateX(-50%);text-align:center}
+.train .glyph{font-size:20px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+.train .val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12.5px;color:var(--yellow);margin-top:31px}
+.flag{position:absolute;top:-29px;transform:translateX(-50%);text-align:center;color:#9FE2A9;font-size:11px;font-weight:700}
+.flag::after{content:"";display:block;width:2px;height:44px;background:#9FE2A9;margin:3px auto 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:13px;margin-top:28px}
+.kpi{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:15px 17px}
+.kpi .k-label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#9FB0CE}
+.kpi .k-val{font-family:'Archivo',sans-serif;font-weight:800;font-size:28px;margin-top:3px}
+.kpi .k-sub{font-size:11.5px;color:#B9C6DE;margin-top:2px}
+.kpi .k-val .unit{font-size:14px;font-weight:600;color:#9FB0CE}
+section{padding:46px 0 6px}
+.sec-head{display:flex;align-items:baseline;gap:13px;border-left:6px solid var(--yellow);padding-left:15px;margin-bottom:5px}
+.sec-head h2{font-family:'Archivo',sans-serif;font-weight:800;font-size:23px}
+.sec-head .tag{font-size:11.5px;color:var(--muted);font-weight:600}
+.sec-sub{color:var(--muted);margin:4px 0 20px 21px;max-width:880px;font-size:13.5px}
+.grid{display:grid;gap:17px}
+.g2{grid-template-columns:1fr 1fr}
+@media(max-width:940px){.g2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:21px 23px;box-shadow:0 1px 2px rgba(2,31,75,.05)}
+.card h3{font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;margin-bottom:2px}
+.card .sub{font-size:12px;color:var(--muted);margin-bottom:13px}
+.chart-box{position:relative;height:300px}
+.chart-tall{height:560px}
+.finding{display:flex;gap:9px;align-items:flex-start;margin-top:13px;background:#FFFBE3;border:1px solid #F0E2A0;border-left:5px solid var(--yellow);border-radius:8px;padding:10px 13px;font-size:13px}
+.finding b{font-weight:700}
+.finding .dot{flex:none;margin-top:1px}
+.action{display:flex;gap:9px;align-items:flex-start;margin-top:9px;background:#EAF3EC;border:1px solid #C3DECA;border-left:5px solid var(--good);border-radius:8px;padding:10px 13px;font-size:13px}
+.action b{font-weight:700;color:#23582A}
+.toggle{display:inline-flex;border:1.5px solid var(--navy);border-radius:8px;overflow:hidden;margin-bottom:13px}
+.toggle button{border:0;background:#fff;color:var(--navy);font-family:'Public Sans',sans-serif;font-weight:700;font-size:12.5px;padding:7px 15px;cursor:pointer}
+.toggle button.on{background:var(--navy);color:var(--yellow)}
+.toggle button:focus-visible{outline:2px solid var(--yellow);outline-offset:-3px}
+.slider-row{display:grid;grid-template-columns:180px 1fr 92px;align-items:center;gap:13px;margin:12px 0}
+.slider-row label{font-size:12.5px;font-weight:600}
+.slider-row .lab-sub{display:block;font-size:10.5px;color:var(--muted);font-weight:500}
+.slider-row output{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13.5px;text-align:right}
+input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:#D8DEE9;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:19px;height:19px;border-radius:50%;background:var(--navy);border:3px solid var(--yellow);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:19px;height:19px;border-radius:50%;background:var(--navy);border:3px solid var(--yellow);cursor:pointer}
+input[type=range]:focus-visible{outline:2px solid var(--navy);outline-offset:3px}
+.sim-out{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:16px}
+.sim-tile{border:1px solid var(--line);border-radius:12px;padding:15px 16px;text-align:center}
+.sim-tile .t-label{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sim-tile .t-val{font-family:'Archivo',sans-serif;font-weight:800;font-size:32px;margin-top:3px}
+.sim-note{margin-top:13px;border-radius:8px;padding:11px 13px;font-size:12.5px;font-weight:600;display:none}
+.sim-note.bad{display:block;background:#FBEAEA;border:1px solid #ECC4C4;color:#8C2B2B}
+.sim-note.good{display:block;background:#E9F4EA;border:1px solid #BFDCC4;color:#23582A}
+.sim-note.info{display:block;background:#EAF1FB;border:1px solid #C5D6EE;color:#1F4475}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:15px}
+.rule{background:var(--card);border:1px solid var(--line);border-top:5px solid var(--navy);border-radius:12px;padding:17px 19px}
+.rule.crit{border-top-color:var(--risk)}
+.rule.watch{border-top-color:var(--amber)}
+.rule .when{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.rule .trig{font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;margin:5px 0 8px}
+.rule .act{font-size:13px}
+.rule .act b{font-weight:700}
+.rule .out{font-size:12px;color:#23582A;margin-top:8px;background:#EFF6F0;border-radius:6px;padding:7px 10px}
+.rule .why{font-size:11.5px;color:var(--muted);margin-top:8px;border-top:1px dashed var(--line);padding-top:7px}
+.chips{display:flex;gap:13px;flex-wrap:wrap;font-size:12px;font-weight:600;margin-bottom:7px}
+.chip::before{content:"";display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.chip.int::before{background:var(--internal)}.chip.ext::before{background:var(--external)}
+.chip.ch::before{background:var(--navy)}.chip.co::before{background:#C55A11}
+.biz{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:6px}
+.biz-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;border-left:5px solid var(--navy)}
+.biz-card .b-num{font-family:'Archivo',sans-serif;font-weight:800;font-size:26px;color:var(--navy)}
+.biz-card .b-lab{font-size:12.5px;color:var(--muted);margin-top:3px}
+footer{margin-top:54px;background:var(--navy);color:#9FB0CE;font-size:12px;border-top:4px solid var(--yellow)}
+footer .wrap{padding:24px 26px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="logo">EUROSTAR <span>★</span> NPS OPERATIONS</div>
+    <nav class="nav" aria-label="Sections">
+      <a href="#overview">Overview</a><a href="#rule16">Delay budget</a>
+      <a href="#risk">Risk zones</a><a href="#causes">Causes &amp; blame</a>
+      <a href="#mcodes">Fleet failure modes</a><a href="#contagion">How disruption spreads</a><a href="#networks">Two networks</a>
+      <a href="#simulator">Lever simulator</a><a href="#playbook">Decision playbook</a>
+      <a href="#value">Business value</a>
+    </nav>
+  </div>
+</div>
+
+<header class="hero" id="overview">
+  <div class="wrap">
+    <h1>Where we stand against the NPS&nbsp;38 target — and the concrete actions that move it</h1>
+    <p>Built from 27,800 linked services (post-travel survey + operational data, Jan 2025 – Mar 2026). Two models behind every number: operations → delay, and delay → NPS, inverted from the target.</p>
+    <div class="track-card" aria-label="Current NPS versus target">
+      <div class="track-label"><span>Network NPS position</span><span>scale 0 – 50</span></div>
+      <div class="track">
+        <div class="train" style="left:73.2%"><div class="glyph">🚆</div><div class="val">36.6 today</div></div>
+        <div class="flag" style="left:76%">TARGET 38</div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="k-label">Gap to target</div><div class="k-val">1.4 <span class="unit">pts</span></div><div class="k-sub">≈ 4.7 min less average delay closes it</div></div>
+        <div class="kpi"><div class="k-label">Delay budget / service</div><div class="k-val">16 <span class="unit">min</span></div><div class="k-sub">beyond this a service drags NPS below 38</div></div>
+        <div class="kpi"><div class="k-label">Critical zone</div><div class="k-val">30–60 <span class="unit">min</span></div><div class="k-sub">NPS bottoms at 13 — act before here</div></div>
+        <div class="kpi"><div class="k-label">Cost per delay minute</div><div class="k-val">0.30 <span class="unit">pts</span></div><div class="k-sub">linear from the satisfaction model</div></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- DELAY BUDGET -->
+<section id="rule16">
+  <div class="sec-head"><h2>The delay budget</h2><span class="tag">delay → NPS · Methodology 1</span></div>
+  <p class="sec-sub">Every minute of average delay costs 0.30 NPS points. The line crosses the target at 16 minutes — that is the budget each service has before it pulls the score down.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h3>NPS falls 0.30 points per minute of delay</h3>
+      <div class="sub">WLS regression on 27,800 services · NPS = 42.8 − 0.30 × delay</div>
+      <div class="chart-box"><canvas id="chLine"></canvas></div>
+      <div class="finding"><span class="dot">📌</span><span><b>Finding:</b> a punctual service scores ~42.8 and crosses the 38 target at <b>16 minutes</b>.</span></div>
+      <div class="action"><span class="dot">✅</span><span><b>Action:</b> treat 16 minutes as the recovery trigger — once a live service passes it, prioritise it for platform, crew and pathway decisions.</span></div>
+    </div>
+    <div class="card">
+      <h3>Translate any delay into an NPS outcome</h3>
+      <div class="sub">Move the slider — the marker follows the regression line</div>
+      <div class="slider-row">
+        <label for="sDelay">Average delay<span class="lab-sub">minutes per service</span></label>
+        <input type="range" id="sDelay" min="0" max="120" step="1" value="16"/>
+        <output id="oDelay" class="mono">16 min</output>
+      </div>
+      <div class="sim-out">
+        <div class="sim-tile"><div class="t-label">Predicted NPS</div><div class="t-val" id="vNps16">38.0</div></div>
+        <div class="sim-tile"><div class="t-label">vs target 38</div><div class="t-val" id="vGap16">±0.0</div></div>
+      </div>
+      <div class="sim-note" id="note16"></div>
+    </div>
+  </div>
+</section>
+
+<!-- RISK ZONES -->
+<section id="risk">
+  <div class="sec-head"><h2>Delay risk zones</h2><span class="tag">severity bands</span></div>
+  <p class="sec-sub">NPS does not fall in a straight line — it collapses between 30 and 60 minutes, then partially recovers past 60 once compensation reaches passengers.</p>
+  <div class="card">
+    <h3>The 30–60 minute red zone</h3>
+    <div class="sub">Mean NPS of services by delay band · 95% confidence intervals · empirical</div>
+    <div class="chart-box"><canvas id="chBands"></canvas></div>
+    <div class="finding"><span class="dot">📌</span><span><b>Finding:</b> NPS bottoms at <b>13</b> in the 30–60 min band, then recovers to 26 beyond 60 min as compensation lands. The damage is worst <i>before</i> compensation currently triggers.</span></div>
+    <div class="action"><span class="dot">✅</span><span><b>Action:</b> bring compensation &amp; passenger care forward to the <b>30-minute</b> mark instead of waiting for 60. The proven recovery at 60+ shows it works — applying it earlier lifts the worst band.</span></div>
+  </div>
+</section>
+
+<!-- CAUSES -->
+<section id="causes">
+  <div class="sec-head"><h2>Causes &amp; blame</h2><span class="tag">same delay, different judgement · Methodology 2</span></div>
+  <p class="sec-sub">Comparing services with the <i>same</i> delay length, the cause still shifts NPS. All recorded causes shown, net of delay duration. Passengers forgive ambient traffic — they punish fleet failures and strikes.</p>
+  <div class="card">
+    <div class="toggle" role="tablist" aria-label="Network filter">
+      <button class="on" id="tgAll">Whole network</button><button id="tgCh">Channel</button><button id="tgCo">Continental</button>
+    </div>
+    <div class="chips"><span class="chip int">Internal — within Eurostar's control</span><span class="chip ext">External</span></div>
+    <div class="chart-box chart-tall"><canvas id="chCauses"></canvas></div>
+    <div class="finding" id="findCauses"><span class="dot">📌</span><span><b>Finding:</b> net of delay length, <b>vandalism (−50), strikes (−35), trainset shortage M3 (−32), depot late release M2 (−22)</b> are punished hardest; traffic regulation (+13) and knock-on pathway loss (+24) are forgiven.</span></div>
+    <div class="action"><span class="dot">✅</span><span><b>Action:</b> the three worst <i>controllable</i> causes are all fleet failures (M1/M2/M3). Prioritise them in maintenance and depot scheduling — see the next section.</span></div>
+  </div>
+</section>
+
+<!-- M-CODES STORY -->
+<section id="mcodes">
+  <div class="sec-head"><h2>The fleet failure modes</h2><span class="tag">linking both methodologies</span></div>
+  <p class="sec-sub">The single most important link in this project: the three operational levers from Methodology 1 each have a failure mode in the M-codes of Methodology 2 — and all three are heavily punished by passengers.</p>
+  <div class="card">
+    <div class="grid g2" style="align-items:center">
+      <div class="chart-box"><canvas id="chMcodes"></canvas></div>
+      <div>
+        <div style="font-size:14px;line-height:1.8">
+          <p><b style="color:var(--navy)">Reliability (R)</b> → fails as <b style="color:var(--internal)">M1 Fleet malfunction</b><br/><span style="color:var(--muted)">1,661 services · 87 min avg delay · −16 NPS net of delay</span></p>
+          <p style="margin-top:11px"><b style="color:var(--navy)">Turnaround (T)</b> → fails as <b style="color:var(--internal)">M2 Late depot release</b><br/><span style="color:var(--muted)">295 services · 80 min avg delay · −22 NPS net of delay</span></p>
+          <p style="margin-top:11px"><b style="color:var(--navy)">Availability (F)</b> → fails as <b style="color:var(--internal)">M3 Trainset shortage</b><br/><span style="color:var(--muted)">361 services · 56 min avg delay · −32 NPS net of delay</span></p>
+        </div>
+      </div>
+    </div>
+    <div class="finding"><span class="dot">📌</span><span><b>Finding:</b> in Methodology 1 fleet availability looked like a weak lever at today's reliability — but Methodology 2 shows that <i>when</i> availability fails (M3), it is the most heavily punished controllable cause in the network. <b>Capacity is insurance, not a daily dial.</b></span></div>
+    <div class="action"><span class="dot">✅</span><span><b>Action:</b> protect against the failure modes, not the averages. Hold standby trainsets to prevent M3, tighten depot release discipline to prevent M2, and target preventive maintenance at the units driving M1.</span></div>
+  </div>
+</section>
+
+
+<!-- CONTAGION -->
+<section id="contagion">
+  <div class="sec-head"><h2>How disruption spreads</h2><span class="tag">propagation &amp; the standby decision</span></div>
+  <p class="sec-sub">A delay is contagious — a late-arriving train pushes out the departures behind it. This shapes one timetabling choice: run a spare train as a service, or hold it as a chain-breaker.</p>
+  <div class="card">
+    <h3>One disruption delays the next ~8 departures</h3>
+    <div class="sub">Excess departure delay of following trains vs a punctual run · network propagation</div>
+    <div class="chart-box"><canvas id="chDecay"></canvas></div>
+    <div class="finding"><span class="dot">📌</span><span><b>Finding:</b> the train right behind a disruption departs <b>~4 min</b> later than it otherwise would, and the knock-on stays material for <b>~8 services</b> — a footprint of <b>~28 delay-minutes</b> spread down the line.</span></div>
+    <div class="action"><span class="dot">✅</span><span><b>Action:</b> recover the <i>first</i> disrupted train fast — stopping it early saves the whole tail of services behind it, not just the one.</span></div>
+  </div>
+</section>
+
+<!-- NETWORKS -->
+<section id="networks">
+  <div class="sec-head"><h2>Two networks, two problems</h2><span class="tag">Channel vs Continental</span></div>
+  <p class="sec-sub">Channel runs four times the delay but its passengers rate more generously; Continental runs cleaner but its passengers drop hard when disrupted — and only judge the cause on Channel.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h3>NPS by network &amp; disruption</h3>
+      <div class="sub">Mean aggregated NPS (×100) · 95% CI</div>
+      <div class="chips"><span class="chip ch">Channel</span><span class="chip co">Continental</span></div>
+      <div class="chart-box"><canvas id="chRouteNps"></canvas></div>
+      <div class="finding"><span class="dot">📌</span><span><b>Finding:</b> a disrupted Continental service averages NPS <b>13</b> vs 35 on Channel — Continental passengers are far less tolerant of disruption.</span></div>
+      <div class="action"><span class="dot">✅</span><span><b>Action:</b> protect Continental punctuality first — its passengers punish disruption hardest. On Continental, compete on <b>speed of recovery</b>, not messaging.</span></div>
+    </div>
+    <div class="card">
+      <h3>Delay by network</h3>
+      <div class="sub">Mean aggregated delay, minutes</div>
+      <div class="chips"><span class="chip ch">Channel</span><span class="chip co">Continental</span></div>
+      <div class="chart-box"><canvas id="chRouteDelay"></canvas></div>
+      <div class="finding"><span class="dot">📌</span><span><b>Finding:</b> Channel averages <b>81 min</b> vs 21 on Continental — a structural gap from border, security and tunnel processes that the fleet levers alone cannot close.</span></div>
+      <div class="action"><span class="dot">✅</span><span><b>Action:</b> on Channel, the lever is <b>disruption wording</b> — state external causes (weather, infrastructure, traffic) clearly and early; they are forgiven only when correctly attributed.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- SIMULATOR -->
+<section id="simulator">
+  <div class="sec-head"><h2>Lever simulator</h2><span class="tag">availability · reliability · turnaround</span></div>
+  <p class="sec-sub">Set the three operational levers — the model chains them through expected delay into NPS. Watch the 93% reliability threshold where capacity changes behaviour.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Set the levers</h3>
+      <div class="sub">Defaults = current network averages</div>
+      <div class="toggle" aria-label="Network"><button id="simCh">Channel</button><button class="on" id="simCo">Continental</button></div>
+      <div class="slider-row">
+        <label for="sF">Fleet deployment<span class="lab-sub">ordered departures / day</span></label>
+        <input type="range" id="sF" min="11" max="34" step="1" value="28"/><output id="oF" class="mono">28</output>
+      </div>
+      <div class="slider-row">
+        <label for="sR">Fleet reliability<span class="lab-sub">departures met</span></label>
+        <input type="range" id="sR" min="90" max="100" step="0.5" value="97"/><output id="oR" class="mono">97%</output>
+      </div>
+      <div class="slider-row">
+        <label for="sT">Turnaround buffer<span class="lab-sub">scheduled rotation, min</span></label>
+        <input type="range" id="sT" min="30" max="240" step="5" value="94"/><output id="oT" class="mono">94 min</output>
+      </div>
+      <div class="sim-note info" id="noteR"></div>
+    </div>
+    <div class="card">
+      <h3>Predicted outcome</h3>
+      <div class="sub">Chained-model estimate for an average service</div>
+      <div class="sim-out">
+        <div class="sim-tile"><div class="t-label">Expected delay</div><div class="t-val" id="vDelay">—</div></div>
+        <div class="sim-tile"><div class="t-label">Expected NPS</div><div class="t-val" id="vNps">—</div></div>
+      </div>
+      <div class="sim-note" id="simVerdict"></div>
+      <div class="finding" style="margin-top:15px"><span class="dot">📌</span><span><b>How to read it:</b> above 93% reliability, extra departures add mild utilisation pressure; below 93%, standby capacity starts cutting delay. Turnaround is real but weak — +1 h buffer ≈ −1.5 min delay.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- PLAYBOOK -->
+<section id="playbook">
+  <div class="sec-head"><h2>Live disruption decision playbook</h2><span class="tag">trigger → action → outcome</span></div>
+  <p class="sec-sub">When a disruption hits, the decision depends on the <b>predicted delay</b> and the <b>cause type</b>. Each rule below fires at a measurable threshold.</p>
+  <div class="rules">
+    <div class="rule watch">
+      <div class="when">Predicted delay</div><div class="trig">Under 16 min</div>
+      <div class="act"><b>Hold &amp; run.</b> Service is within budget — no special action; standard recovery.</div>
+      <div class="out">Outcome: NPS stays ≥ 38. No compensation cost.</div>
+      <div class="why">NPS = 42.8 − 0.30 × delay.</div>
+    </div>
+    <div class="rule watch">
+      <div class="when">Predicted delay 16–30 min · any cause</div><div class="trig">Prioritise recovery</div>
+      <div class="act"><b>Give the service priority</b> on pathway and crew. Begin proactive passenger information now.</div>
+      <div class="out">Outcome: keeps NPS in the 30s; avoids slide into the red zone.</div>
+      <div class="why">Each minute saved here = +0.30 NPS pts.</div>
+    </div>
+    <div class="rule crit">
+      <div class="when">Predicted delay 20+ min · INTERNAL cause (M1/M2/M3)</div><div class="trig">Recover hard + own it</div>
+      <div class="act"><b>Throw recovery resource at it and communicate honestly.</b> Deploy standby for M3; on Channel, state the cause clearly. Internal causes are the most punished.</div>
+      <div class="out">Outcome: avoids the −22 to −32 attribution penalty stacking on top of the delay.</div>
+      <div class="why">M3 −32, M2 −22, M1 −16 net of delay. Blame effect significant on Channel.</div>
+    </div>
+    <div class="rule crit">
+      <div class="when">Predicted delay 30–60 min · any cause</div><div class="trig">RED ZONE — trigger care</div>
+      <div class="act"><b>Trigger compensation and passenger care immediately.</b> Do not wait for 60. Activate hotel/taxi/food protocols early.</div>
+      <div class="out">Outcome: lifts the worst band (NPS 13) toward the recovered 60+ level (NPS 26).</div>
+      <div class="why">Band NPS: 24 → 13 (30–60) → 26 (60+, compensated).</div>
+    </div>
+    <div class="rule">
+      <div class="when">Long delay · EXTERNAL cause · Channel</div><div class="trig">Communicate the cause</div>
+      <div class="act"><b>State the external cause clearly and early</b> (weather, infrastructure, traffic). On Channel these are forgiven when correctly attributed; never let them read as a Eurostar failure.</div>
+      <div class="out">Outcome: external causes recover toward neutral — traffic regulation scores +13 net of delay.</div>
+      <div class="why">Attribution effect confirmed on Channel (p&lt;0.001), absent on Continental.</div>
+    </div>
+    <div class="rule crit">
+      <div class="when">Very long delay · cascading network risk</div><div class="trig">Cancel decisively</div>
+      <div class="act"><b>If a service will run extremely late and threatens downstream rotations, cancel cleanly and rebook</b> rather than dragging a severely delayed service through the network.</div>
+      <div class="out">Outcome: protects following services from knock-on delay; contains total network NPS loss. Pair with proactive rebooking.</div>
+      <div class="why">Turnaround buffer limits propagation; a single very late service cascades into others.</div>
+    </div>
+    <div class="rule">
+      <div class="when">First train in a disruption · dense day</div><div class="trig">Break the chain early</div>
+      <div class="act"><b>Prioritise recovering the first disrupted train, and on dense or high-risk days hold a trainset on standby</b> to substitute in and stop the knock-on before it spreads.</div>
+      <div class="out">Outcome: protects the ~8 following departures; saves the ~28-minute propagation footprint a single disruption creates.</div>
+      <div class="why">A late arrival adds ~4 min to the next departure; the chain stays material for ~8 services.</div>
+    </div>
+  </div>
+</section>
+
+<!-- BUSINESS VALUE -->
+<section id="value">
+  <div class="sec-head"><h2>What this delivers for Eurostar</h2><span class="tag">predicted impact</span></div>
+  <p class="sec-sub">Acting on these rules converts operational decisions into measurable NPS and commercial value.</p>
+  <div class="biz">
+    <div class="biz-card"><div class="b-num">+1.4 pts</div><div class="b-lab">NPS gap to target, closeable through ≈ 4.7 min less average delay across the network</div></div>
+    <div class="biz-card"><div class="b-num">~13 pts</div><div class="b-lab">NPS protected per service by catching a 30–60 min delay early (band 13 → recovered 26)</div></div>
+    <div class="biz-card"><div class="b-num">−32 → 0</div><div class="b-lab">attribution penalty avoided per M3 trainset-shortage event prevented by standby cover</div></div>
+    <div class="biz-card"><div class="b-num">2 plans</div><div class="b-lab">network-specific playbooks: messaging on Channel, recovery speed on Continental</div></div>
+    <div class="biz-card"><div class="b-num">~28 min</div><div class="b-lab">propagation footprint contained per disruption caught early — protecting the ~8 trains behind it</div></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Qualitative &amp; quantitative benefits</h3>
+    <div style="font-size:13.5px;line-height:1.8">
+      <p><b style="color:var(--navy)">Quantitative:</b> a higher NPS lifts recommendation and repeat travel, the commercial driver behind the score; compensation spend is targeted to the 30–60 min band where it recovers the most NPS rather than applied late; standby-fleet investment is justified as insurance against the single most-punished failure mode.</p>
+      <p style="margin-top:10px"><b style="color:var(--navy)">Qualitative:</b> disruption teams get a clear, shared rule for what to do and when; communication becomes network-specific and honest, protecting brand trust; maintenance and depot priorities are tied directly to passenger sentiment rather than set in isolation.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><b style="color:#fff">Model basis.</b> Chained regressions on 27,800 linked services: operations → delay (CV R² 0.40) and delay → NPS (CV R² 0.10; cause model CV R² 0.19 → 0.27 with route). Estimates are conditional averages, not per-train forecasts. Attribution effects bracket between cause-only and route-controlled specifications.</div>
+    <div>Bachelor thesis artefact · Business Analytics · data Jan 2025 – Mar 2026</div>
+  </div>
+</footer>
+
+<script>
+const LB={b0:0.4284,b1:-0.0030};
+const LA={c:217.4485,cont:-58.7846,F:-5.3168,R:-146.3311,T:-0.0248,FR:5.7239};
+const nps100=d=>(LB.b0+LB.b1*d)*100;
+const C={navy:'#021F4B',yellow:'#FFDD00',int:'#C0392B',ext:'#2E75B6',cont:'#C55A11',target:'#2E7D32',risk:'#D64545',grid:'#E8ECF2'};
+Chart.defaults.font.family="'Public Sans', sans-serif";
+Chart.defaults.color='#3A4860';
+
+/* 1 delay->NPS */
+const xs=Array.from({length:121},(_,i)=>i);
+const chLine=new Chart(document.getElementById('chLine'),{type:'line',
+  data:{labels:xs,datasets:[
+    {data:xs.map(nps100),borderColor:C.navy,borderWidth:2.5,pointRadius:0,tension:0},
+    {data:xs.map(()=>38),borderColor:C.target,borderDash:[5,4],borderWidth:1.6,pointRadius:0},
+    {type:'scatter',data:[{x:16,y:nps100(16)}],pointRadius:7,pointBackgroundColor:C.yellow,pointBorderColor:C.navy,pointBorderWidth:2.5}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},
+    scales:{x:{title:{display:true,text:'Average delay (minutes)'},grid:{display:false},ticks:{maxTicksLimit:9}},
+            y:{title:{display:true,text:'Predicted NPS'},grid:{color:C.grid},suggestedMin:5,suggestedMax:45}}}});
+const sD=document.getElementById('sDelay'),oD=document.getElementById('oDelay'),vN=document.getElementById('vNps16'),vG=document.getElementById('vGap16'),n16=document.getElementById('note16');
+function upd16(){const d=+sD.value,n=nps100(d),g=n-38;
+  oD.textContent=d+' min';vN.textContent=n.toFixed(1);vG.textContent=(g>=0?'+':'')+g.toFixed(1);vG.style.color=g>=0?C.target:C.risk;
+  chLine.data.datasets[2].data=[{x:d,y:n}];chLine.update('none');
+  if(g>=0){n16.className='sim-note good';n16.textContent='Above target — inside the 16-minute budget. Run normally.';}
+  else if(d<=30){n16.className='sim-note bad';n16.textContent='Below target. Recover '+Math.ceil(d-16)+' min to return over 38, or prioritise this service now.';}
+  else{n16.className='sim-note bad';n16.textContent='Red zone — trigger compensation and passenger care immediately, do not wait for 60 min.';}}
+sD.addEventListener('input',upd16);upd16();
+
+/* 2 bands */
+new Chart(document.getElementById('chBands'),{type:'bar',
+  data:{labels:['≤ 5 min\n(punctual)','5–15 min','15–30 min','30–60 min','> 60 min'],
+    datasets:[{data:[39,37,24,13,26],backgroundColor:['#2E7D32','#7BA05B','#E8A13A','#D64545','#E8A13A'],borderRadius:6,maxBarThickness:90}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Mean NPS: '+c.parsed.y}}},
+    scales:{y:{title:{display:true,text:'Mean NPS of services in band'},grid:{color:C.grid},suggestedMax:45},x:{grid:{display:false}}}}});
+
+/* 3 causes - ALL causes, net of duration (Spec B) */
+const causes={
+  all:[['Lost pathway (knock-on)',24.2,'ext'],['Traffic regulation',12.9,'ext'],['Train manager',1.2,'int'],
+    ['OCC comms error',-0.5,'int'],['Other external',-0.9,'ext'],['Infra works',-2.5,'ext'],
+    ['Congestion S2',-3.8,'int'],['Terminal staff S4',-6.9,'int'],['Driving O1',-6.3,'int'],
+    ['Weather restriction',-5.8,'ext'],['Trains-related incident',-9.8,'ext'],['Animals on track',-10.5,'ext'],
+    ['Planning/rostering O3',-11.4,'int'],['Bomb alert',-11.5,'ext'],['Infrastructure fault',-12.8,'ext'],
+    ['Fleet malfunction M1',-15.9,'int'],['Catering K1',-17.9,'int'],['Persons on track I2',-18.0,'ext'],
+    ['Depot late release M2',-22.3,'int'],['Other internal',-23.1,'int'],['Emergency services',-25.6,'ext'],
+    ['Trainset shortage M3',-32.0,'int'],['Strike (infra mgr)',-34.5,'ext'],['Vandalism',-50.0,'ext']],
+  ch:[['Traffic regulation',29.7,'ext'],['Trainset shortage M3',16.1,'int'],['Train manager',14.9,'int'],
+    ['Catering K1',11.2,'int'],['Infra works',11.2,'ext'],['Trains-related incident',9.2,'ext'],
+    ['Driving O1',8.3,'int'],['Bomb alert',6.3,'ext'],['Passengers S1',4.8,'int'],['OCC comms error',4.5,'int'],
+    ['Weather restriction',4.1,'ext'],['Infrastructure fault',4.0,'ext'],['Planning O3',3.5,'int'],
+    ['Animals on track',2.8,'ext'],['Fleet malfunction M1',-7.8,'int'],['Persons on track I2',-10.0,'ext'],
+    ['Depot late release M2',-13.2,'int']],
+  co:[['Weather restriction',5.3,'ext'],['Traffic regulation',3.7,'ext'],['Bomb alert',1.3,'ext'],
+    ['Planning O3',-0.8,'int'],['Driving O1',-1.1,'int'],['Animals on track',-2.2,'ext'],['Passengers S1',-2.3,'int'],
+    ['OCC comms error',-2.8,'int'],['Strike (infra mgr)',-4.0,'ext'],['Trains-related incident',-4.2,'ext'],
+    ['Infrastructure fault',-4.9,'ext'],['Catering K1',-5.3,'int'],['Other external',-5.8,'ext'],
+    ['Other internal',-9.4,'int'],['Fleet malfunction M1',-9.6,'int'],['Trainset shortage M3',-7.1,'int'],
+    ['Depot late release M2',-7.2,'int'],['Emergency services',-4.9,'ext'],['Vandalism',-22.9,'ext']]
+};
+const findings={
+  all:'<b>Finding:</b> net of delay length, <b>vandalism (−50), strikes (−35), trainset shortage M3 (−32), depot late release M2 (−22)</b> are punished hardest; traffic regulation (+13) and knock-on pathway loss (+24) are forgiven.',
+  ch:'<b>Finding:</b> Channel passengers sharply separate causes — depot late release and persons on track are punished, ambient traffic causes score above comparable services. This is where wording the disruption matters most.',
+  co:'<b>Finding:</b> Continental coefficients are uniformly small — passengers respond to the clock, not the cause. Vandalism is the exception (−23). Here, recovery speed is the lever, not messaging.'
+};
+let chCauses;
+function drawCauses(key){
+  const rows=causes[key].slice().sort((a,b)=>a[1]-b[1]);
+  if(chCauses)chCauses.destroy();
+  chCauses=new Chart(document.getElementById('chCauses'),{type:'bar',
+    data:{labels:rows.map(r=>r[0]),datasets:[{data:rows.map(r=>r[1]),
+      backgroundColor:rows.map(r=>r[2]==='int'?C.int:C.ext),borderRadius:4,maxBarThickness:18}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>'NPS vs punctual, same delay: '+(c.parsed.x>0?'+':'')+c.parsed.x}}},
+      scales:{x:{title:{display:true,text:'NPS points vs punctual services with the same delay'},grid:{color:C.grid}},
+              y:{grid:{display:false},ticks:{font:{size:11}}}}}});
+  document.querySelector('#findCauses span:last-child').innerHTML=findings[key];
+}
+drawCauses('all');
+({tgAll:'all',tgCh:'ch',tgCo:'co'});
+[['tgAll','all'],['tgCh','ch'],['tgCo','co']].forEach(([id,k])=>{
+  document.getElementById(id).addEventListener('click',e=>{
+    document.querySelectorAll('#causes .toggle button').forEach(b=>b.classList.remove('on'));
+    e.target.classList.add('on');drawCauses(k);});});
+
+/* 4 M-codes */
+new Chart(document.getElementById('chMcodes'),{type:'bar',
+  data:{labels:['M1 Fleet\nmalfunction','M2 Depot\nlate release','M3 Trainset\nshortage'],
+    datasets:[
+      {label:'Avg delay (min)',data:[87,80,56],backgroundColor:'#9FB0CE',borderRadius:5,yAxisID:'y',maxBarThickness:46},
+      {label:'NPS penalty (net of delay)',data:[-16,-22,-32],backgroundColor:C.int,borderRadius:5,yAxisID:'y1',maxBarThickness:46}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
+    title:{display:true,text:'Each lever\'s failure mode — delay and blame',font:{size:12}}},
+    scales:{y:{position:'left',title:{display:true,text:'Avg delay (min)'},grid:{display:false},suggestedMax:100},
+            y1:{position:'right',title:{display:true,text:'NPS penalty'},grid:{color:C.grid},suggestedMin:-40,suggestedMax:0}}}});
+
+/* contagion decay — real figures from the propagation notebook */
+new Chart(document.getElementById('chDecay'),{type:'bar',
+  data:{labels:['1','2','3','4','5','6','7','8'],
+    datasets:[{label:'Excess departure delay (min)',
+      data:[4.2,1.3,3.2,4.1,4.2,4.2,3.4,3.4],
+      backgroundColor:'#1f4e79',borderRadius:4,maxBarThickness:42}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false},
+    tooltip:{callbacks:{label:c=>'+'+c.parsed.y+' min vs a punctual run'}}},
+    scales:{x:{title:{display:true,text:'Services after the disruption'},grid:{display:false}},
+            y:{title:{display:true,text:'Excess departure delay (min)'},grid:{color:C.grid},suggestedMax:6}}}});
+
+/* 5 route */
+new Chart(document.getElementById('chRouteNps'),{type:'bar',
+  data:{labels:['Punctual (≤ 5 min)','Disrupted (> 5 min)'],
+    datasets:[{label:'Channel',data:[45,35],backgroundColor:C.navy,borderRadius:5,maxBarThickness:70},
+              {label:'Continental',data:[39,13],backgroundColor:C.cont,borderRadius:5,maxBarThickness:70}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{y:{grid:{color:C.grid},suggestedMax:50,title:{display:true,text:'Mean NPS'}},x:{grid:{display:false}}}}});
+new Chart(document.getElementById('chRouteDelay'),{type:'bar',
+  data:{labels:['All services','Disrupted only'],
+    datasets:[{label:'Channel',data:[81,82],backgroundColor:C.navy,borderRadius:5,maxBarThickness:70},
+              {label:'Continental',data:[21,38],backgroundColor:C.cont,borderRadius:5,maxBarThickness:70}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{y:{grid:{color:C.grid},title:{display:true,text:'Mean delay (min)'}},x:{grid:{display:false}}}}});
+
+/* 6 simulator */
+let simRoute='co';
+const sF=document.getElementById('sF'),sR=document.getElementById('sR'),sT=document.getElementById('sT'),
+oF=document.getElementById('oF'),oR=document.getElementById('oR'),oT=document.getElementById('oT'),
+vDe=document.getElementById('vDelay'),vNp=document.getElementById('vNps'),verdict=document.getElementById('simVerdict'),noteR=document.getElementById('noteR');
+function sim(){const F=+sF.value,R=+sR.value/100,T=+sT.value;
+  oF.textContent=F;oR.textContent=(+sR.value).toFixed(1)+'%';oT.textContent=T+' min';
+  let d=LA.c+(simRoute==='co'?LA.cont:0)+LA.F*F+LA.R*R+LA.T*T+LA.FR*F*R;d=Math.max(0,d);
+  const n=Math.max(-100,Math.min(100,nps100(d)));
+  vDe.textContent=d.toFixed(0)+' min';vNp.textContent=n.toFixed(1);
+  vNp.style.color=n>=38?C.target:(n>=30?'#B07818':C.risk);
+  const g=n-38;
+  if(g>=0){verdict.className='sim-note good';verdict.textContent='On target: expected NPS '+n.toFixed(1)+' ≥ 38.';}
+  else{verdict.className='sim-note bad';verdict.textContent='Short by '+Math.abs(g).toFixed(1)+' pts — needs ≈ '+Math.ceil(Math.abs(g)/0.30)+' min less expected delay.';}
+  const dF=LA.F+LA.FR*R;noteR.style.display='block';noteR.className='sim-note info';
+  noteR.textContent=R<0.93?('Reliability below 93% — capacity pays off: each extra departure changes delay by '+dF.toFixed(2)+' min.'):
+    ('Reliability above 93% — extra departures add slight pressure ('+(dF>0?'+':'')+dF.toFixed(2)+' min each). Capacity is insurance here.');}
+[sF,sR,sT].forEach(s=>s.addEventListener('input',sim));
+document.getElementById('simCh').addEventListener('click',e=>{simRoute='ch';document.querySelectorAll('#simulator .toggle button').forEach(b=>b.classList.remove('on'));e.target.classList.add('on');sim();});
+document.getElementById('simCo').addEventListener('click',e=>{simRoute='co';document.querySelectorAll('#simulator .toggle button').forEach(b=>b.classList.remove('on'));e.target.classList.add('on');sim();});
+sim();
+</script>
+</body>
+</html>
